@@ -15,7 +15,7 @@ This guide helps you deploy SACH for **$0/month** using:
 3. Under **Database Access**, create a user with read/write access
 4. Under **Network Access**, click **Allow Access from Anywhere** (0.0.0.0/0)
 5. Click **Connect** → **Drivers** → Copy the connection string
-   - It looks like: `mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/sachcheck_db`
+   - It looks like: `mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/sach_db`
    - Replace `<password>` with your actual password
 
 **Save this connection string — you'll need it for the backend.**
@@ -42,7 +42,7 @@ This guide helps you deploy SACH for **$0/month** using:
    SARVAM_API_KEY    = sk_zluof264_YjnN1nb17u6CWfx9gzCcFIil
    RAPIDAPI_KEY      = 3039a462c5msh848800efd267facp13167ejsn8fc0d6459227
    MONGO_URL         = <your MongoDB Atlas connection string from Step 1>
-   DB_NAME           = sachcheck_db
+   DB_NAME           = sach_db
    ```
 7. Click **Create Web Service**
 8. Wait for the build to complete (~3-5 min)
