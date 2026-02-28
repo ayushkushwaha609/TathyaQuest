@@ -96,6 +96,40 @@ def test_check_endpoint_valid_url():
             if not isinstance(data["confidence"], int) or not (0 <= data["confidence"] <= 100):
                 log_test("Valid YouTube URL", "FAIL", f"Invalid confidence: {data['confidence']}")
                 return False
+                
+            # Validate enhanced context fields
+            if not isinstance(data["reason"], str) or len(data["reason"]) < 5:
+                log_test("Valid YouTube URL", "FAIL", "Reason field invalid or too short")
+                return False
+                
+            if not isinstance(data["verdict_text"], str) or len(data["verdict_text"]) < 5:
+                log_test("Valid YouTube URL", "FAIL", "Verdict_text field invalid or too short")
+                return False
+                
+            if not isinstance(data["category"], str) or len(data["category"]) < 3:
+                log_test("Valid YouTube URL", "FAIL", "Category field invalid or too short")
+                return False
+                
+            if not isinstance(data["key_points"], list) or len(data["key_points"]) == 0:
+                log_test("Valid YouTube URL", "FAIL", "Key_points must be a non-empty array")
+                return False
+                
+            if not isinstance(data["fact_details"], str) or len(data["fact_details"]) < 5:
+                log_test("Valid YouTube URL", "FAIL", "Fact_details field invalid or too short")
+                return False
+                
+            if not isinstance(data["what_to_know"], str) or len(data["what_to_know"]) < 5:
+                log_test("Valid YouTube URL", "FAIL", "What_to_know field invalid or too short")
+                return False
+                
+            if not isinstance(data["sources_note"], str) or len(data["sources_note"]) < 5:
+                log_test("Valid YouTube URL", "FAIL", "Sources_note field invalid or too short")
+                return False
+            
+            # Audio can be string or null
+            if data["audio_base64"] is not None and not isinstance(data["audio_base64"], str):
+                log_test("Valid YouTube URL", "FAIL", "Audio_base64 must be string or null")
+                return False
             
             # Log success with key details
             message = f"""Response structure valid:
