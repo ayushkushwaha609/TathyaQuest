@@ -38,8 +38,8 @@ app = FastAPI(title="SachCheck API", version="1.0.0")
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# In-memory cache for MVP
-cache = {}
+# MongoDB collection for caching
+checks_collection = db["checks"]
 
 # Configure logging
 logging.basicConfig(
