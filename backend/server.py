@@ -513,13 +513,6 @@ async def check_claim(request: CheckRequest):
             detail={"error": "invalid_url", "message": "Please provide a valid Instagram or YouTube link."}
         )
     
-    # Check if it's Instagram (not supported via RapidAPI yet)
-    if is_instagram_url(url):
-        raise HTTPException(
-            status_code=422,
-            detail={"error": "instagram_not_supported", "message": "Instagram reels are not supported yet. Please try a YouTube Shorts link instead."}
-        )
-    
     # Validate language code
     if language_code not in LANGUAGE_MAP:
         language_code = "hi-IN"  # Default to Hindi
@@ -532,22 +525,32 @@ async def check_claim(request: CheckRequest):
     
     logger.info(f"Processing URL: {url} with language: {language_code}")
     
-    # Extract video ID for YouTube
-    video_id = extract_youtube_video_id(url)
-    if not video_id:
-        raise HTTPException(
-            status_code=422,
-            detail={"error": "invalid_youtube_url", "message": "Could not extract video ID from the YouTube URL."}
-        )
-    
-    logger.info(f"Extracted video ID: {video_id}")
+    # Determine platform and extract accordingly
+    is_instagram = is_instagram_url(url)
+    is_youtube = is_youtube_url(url)
     
     # Create temp directory for audio
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
-            # Step 1: Extract audio via RapidAPI
-            logger.info("Extracting audio via RapidAPI...")
-            audio_path = await extract_audio_rapidapi(video_id, temp_dir)
+            # Step 1: Extract audio based on platform
+            if is_instagram:
+                logger.info("Processing Instagram Reel...")
+                normalized_url = extract_instagram_reel_url(url)
+                audio_path = await extract_audio_instagram(normalized_url, temp_dir)
+            elif is_youtube:
+                video_id = extract_youtube_video_id(url)
+                if not video_id:
+                    raise HTTPException(
+                        status_code=422,
+                        detail={"error": "invalid_youtube_url", "message": "Could not extract video ID from the YouTube URL."}
+                    )
+                logger.info(f"Processing YouTube video ID: {video_id}")
+                audio_path = await extract_audio_rapidapi(video_id, temp_dir)
+            else:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"error": "unsupported_platform", "message": "Only Instagram and YouTube are supported."}
+                )
             
             # Step 2: Transcribe
             logger.info("Transcribing audio...")
