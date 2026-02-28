@@ -435,7 +435,12 @@ Return ONLY this JSON with no other text:
             "verdict": result.get("verdict", "MISLEADING"),
             "confidence": result.get("confidence", 50),
             "reason": result.get("reason", "Analysis inconclusive"),
-            "verdict_text": verdict_text
+            "verdict_text": verdict_text,
+            "category": result.get("category", "general"),
+            "key_points": result.get("key_points", []),
+            "fact_details": result.get("fact_details", ""),
+            "what_to_know": result.get("what_to_know", ""),
+            "sources_note": result.get("sources_note", "")
         }
     except json.JSONDecodeError as e:
         logger.error(f"JSON parse error: {e}, Response: {response_text}")
@@ -444,7 +449,12 @@ Return ONLY this JSON with no other text:
             "verdict": "MISLEADING",
             "confidence": 0,
             "reason": "Failed to analyze the content",
-            "verdict_text": "Analysis failed"
+            "verdict_text": "Analysis failed",
+            "category": "general",
+            "key_points": [],
+            "fact_details": "",
+            "what_to_know": "",
+            "sources_note": ""
         }
 
 async def synthesize_speech(text: str, language_code: str) -> Optional[str]:
