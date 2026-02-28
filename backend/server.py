@@ -117,17 +117,24 @@ async def extract_audio_instagram(url: str, output_dir: str) -> str:
     async with httpx.AsyncClient(timeout=90.0) as client:
         # List of Instagram APIs to try (in order of reliability)
         instagram_apis = [
+            # instagram-video-downloader13 - different endpoint variations
+            {
+                "host": "instagram-video-downloader13.p.rapidapi.com", 
+                "endpoint": "/",
+                "params": {"url": url},
+                "video_keys": ["video", "video_url", "url", "download_link", "download_url"]
+            },
+            {
+                "host": "instagram-video-downloader13.p.rapidapi.com", 
+                "endpoint": "/media",
+                "params": {"url": url},
+                "video_keys": ["video", "video_url", "url", "download_link", "download_url"]
+            },
             {
                 "host": "instagram120.p.rapidapi.com",
                 "endpoint": "/api/instagram/links",
                 "params": {"url": url},
                 "video_keys": ["video_url", "url", "download_url", "video"]
-            },
-            {
-                "host": "instagram-video-downloader13.p.rapidapi.com", 
-                "endpoint": "/download",
-                "params": {"url": url},
-                "video_keys": ["video", "video_url", "url", "download_link"]
             },
             {
                 "host": "instagram-downloader38.p.rapidapi.com",
@@ -145,7 +152,7 @@ async def extract_audio_instagram(url: str, output_dir: str) -> str:
         
         for api in instagram_apis:
             try:
-                logger.info(f"Trying {api['host']}...")
+                logger.info(f"Trying {api['host']}{api['endpoint']}...")
                 response = await client.get(
                     f"https://{api['host']}{api['endpoint']}",
                     params=api['params'],
@@ -161,7 +168,7 @@ async def extract_audio_instagram(url: str, output_dir: str) -> str:
                 if response.status_code == 200:
                     try:
                         data = response.json()
-                        logger.info(f"API response data keys: {data.keys() if isinstance(data, dict) else type(data)}")
+                        logger.info(f"API response: {json.dumps(data)[:500]}")
                         
                         # Try to extract video URL from various response formats
                         video_url = None
@@ -173,20 +180,28 @@ async def extract_audio_instagram(url: str, output_dir: str) -> str:
                                     video_url = data[key]
                                     break
                             
-                            # Nested in 'data' or 'result'
+                            # Nested in 'data', 'result', 'response', 'media'
                             if not video_url:
-                                nested = data.get("data") or data.get("result") or data.get("response") or {}
-                                if isinstance(nested, dict):
-                                    for key in api['video_keys']:
-                                        if nested.get(key) and str(nested.get(key)).startswith("http"):
-                                            video_url = nested[key]
-                                            break
-                                elif isinstance(nested, list) and len(nested) > 0:
-                                    first = nested[0] if isinstance(nested[0], dict) else {}
-                                    for key in api['video_keys']:
-                                        if first.get(key) and str(first.get(key)).startswith("http"):
-                                            video_url = first[key]
-                                            break
+                                for nested_key in ["data", "result", "response", "media", "video"]:
+                                    nested = data.get(nested_key)
+                                    if isinstance(nested, dict):
+                                        for key in api['video_keys']:
+                                            if nested.get(key) and str(nested.get(key)).startswith("http"):
+                                                video_url = nested[key]
+                                                break
+                                    elif isinstance(nested, list) and len(nested) > 0:
+                                        first = nested[0] if isinstance(nested[0], dict) else {}
+                                        for key in api['video_keys']:
+                                            if first.get(key) and str(first.get(key)).startswith("http"):
+                                                video_url = first[key]
+                                                break
+                                        # Also check if list item is directly a URL
+                                        if not video_url and isinstance(nested[0], str) and nested[0].startswith("http"):
+                                            video_url = nested[0]
+                                    elif isinstance(nested, str) and nested.startswith("http"):
+                                        video_url = nested
+                                    if video_url:
+                                        break
                         
                         if video_url:
                             logger.info(f"Found video URL: {video_url[:100]}...")
@@ -231,7 +246,7 @@ async def extract_audio_instagram(url: str, output_dir: str) -> str:
                 elif response.status_code == 403:
                     logger.warning(f"{api['host']}: Not subscribed (403)")
                 else:
-                    logger.warning(f"{api['host']}: HTTP {response.status_code}")
+                    logger.warning(f"{api['host']}: HTTP {response.status_code} - {response.text[:200]}")
                     
             except Exception as e:
                 logger.warning(f"{api['host']} failed: {e}")
