@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: sach-api
+    name: tathya-api
     runtime: docker
     dockerfilePath: ./Dockerfile
     region: singapore
@@ -15,4 +15,4 @@ services:
       - key: MONGO_URL
         sync: false
       - key: DB_NAME
-        value: sach_db
+        value: tathya_db

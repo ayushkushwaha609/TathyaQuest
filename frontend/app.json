@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "SACH",
-    "slug": "sach",
+    "name": "Tathya",
+    "slug": "tathya",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "sach",
+    "scheme": "tathya",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sach.app"
+      "bundleIdentifier": "com.tathya.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +18,7 @@
         "backgroundColor": "#0F172A"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.sach.app"
+      "package": "com.tathya.app"
     },
     "web": {
       "bundler": "metro",

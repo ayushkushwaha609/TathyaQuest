@@ -22,7 +22,7 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'sach_db')]
+db = client[os.environ.get('DB_NAME', 'tathya_db')]
 
 # API Keys
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
@@ -33,7 +33,7 @@ RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY')
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 # Create the main app
-app = FastAPI(title="SACH API", version="1.0.0")
+app = FastAPI(title="Tathya API", version="1.0.0")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
