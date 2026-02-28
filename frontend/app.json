@@ -1,22 +1,78 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "SachCheck",
+    "slug": "sachcheck",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "sachcheck",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sachcheck.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#0F172A"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.sachcheck.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "*.instagram.com",
+              "pathPrefix": "/reel"
+            },
+            {
+              "scheme": "https",
+              "host": "*.instagram.com",
+              "pathPrefix": "/reels"
+            },
+            {
+              "scheme": "https",
+              "host": "www.instagram.com",
+              "pathPrefix": "/reel"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "youtube.com",
+              "pathPrefix": "/shorts"
+            },
+            {
+              "scheme": "https",
+              "host": "www.youtube.com",
+              "pathPrefix": "/shorts"
+            },
+            {
+              "scheme": "https",
+              "host": "youtu.be"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "SEND",
+          "category": ["DEFAULT"],
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -31,7 +87,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#0F172A"
         }
       ]
     ],
