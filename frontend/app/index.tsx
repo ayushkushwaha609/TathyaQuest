@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   Platform,
   ScrollView,
   Keyboard,
-  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -29,24 +28,6 @@ export default function HomeScreen() {
     error,
     runCheck,
   } = useCheckStore();
-  
-  // Animation for when URL is received via share
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-  const prevUrl = useRef(url);
-  
-  // Animate when URL changes (e.g., received via share)
-  useEffect(() => {
-    if (url && url !== prevUrl.current && prevUrl.current === '') {
-      // URL was just set (likely from share)
-      Animated.sequence([
-        Animated.timing(shakeAnim, { toValue: 10, duration: 100, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -10, duration: 100, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 10, duration: 100, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
-      ]).start();
-    }
-    prevUrl.current = url;
-  }, [url, shakeAnim]);
 
   const handleCheck = async () => {
     Keyboard.dismiss();
@@ -79,13 +60,7 @@ export default function HomeScreen() {
           {/* Input Section */}
           <View style={styles.inputSection}>
             <Text style={styles.inputLabel}>Paste Video Link</Text>
-            <Animated.View 
-              style={[
-                styles.inputContainer,
-                { transform: [{ translateX: shakeAnim }] },
-                url && prevUrl.current === '' && styles.inputContainerHighlight
-              ]}
-            >
+            <View style={styles.inputContainer}>
               <Ionicons
                 name="link"
                 size={20}
@@ -107,7 +82,7 @@ export default function HomeScreen() {
                   <Ionicons name="close-circle" size={20} color="#6B7280" />
                 </TouchableOpacity>
               )}
-            </Animated.View>
+            </View>
 
             {/* Error Message */}
             {error && (
@@ -227,10 +202,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: '#374151',
-  },
-  inputContainerHighlight: {
-    borderColor: '#10B981',
-    borderWidth: 2,
   },
   inputIcon: {
     marginRight: 12,
