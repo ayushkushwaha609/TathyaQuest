@@ -338,7 +338,7 @@ async def synthesize_speech(text: str, language_code: str) -> Optional[str]:
                 json={
                     "inputs": [text],
                     "target_language_code": language_code,
-                    "speaker": "priya",  # Valid speaker name
+                    "speaker": "anushka",  # Compatible speaker for bulbul:v2
                     "model": "bulbul:v2",  # Stable model version
                     "pace": 1.0,
                     "enable_preprocessing": True
