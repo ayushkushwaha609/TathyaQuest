@@ -15,4 +15,4 @@ services:
       - key: MONGO_URL
         sync: false
       - key: DB_NAME
-        value: sachcheck_db
+        value: sach_db
