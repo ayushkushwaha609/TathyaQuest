@@ -115,112 +115,67 @@ async def extract_audio_instagram(url: str, output_dir: str) -> str:
     logger.info(f"Fetching Instagram Reel via RapidAPI: {url}")
     
     async with httpx.AsyncClient(timeout=90.0) as client:
-        # List of Instagram APIs to try (in order of reliability)
-        instagram_apis = [
-            # instagram-video-downloader13 - different endpoint variations
-            {
-                "host": "instagram-video-downloader13.p.rapidapi.com", 
-                "endpoint": "/",
-                "params": {"url": url},
-                "video_keys": ["video", "video_url", "url", "download_link", "download_url"]
-            },
-            {
-                "host": "instagram-video-downloader13.p.rapidapi.com", 
-                "endpoint": "/media",
-                "params": {"url": url},
-                "video_keys": ["video", "video_url", "url", "download_link", "download_url"]
-            },
-            {
-                "host": "instagram120.p.rapidapi.com",
-                "endpoint": "/api/instagram/links",
-                "params": {"url": url},
-                "video_keys": ["video_url", "url", "download_url", "video"]
-            },
-            {
-                "host": "instagram-downloader38.p.rapidapi.com",
-                "endpoint": "/download",
-                "params": {"url": url},
-                "video_keys": ["video_url", "url", "download", "video"]
-            },
-            {
-                "host": "instagram-reels-downloader6.p.rapidapi.com",
-                "endpoint": "/download",
-                "params": {"url": url},
-                "video_keys": ["video_url", "url", "download_url", "media"]
-            },
-        ]
-        
-        for api in instagram_apis:
-            try:
-                logger.info(f"Trying {api['host']}{api['endpoint']}...")
-                response = await client.get(
-                    f"https://{api['host']}{api['endpoint']}",
-                    params=api['params'],
-                    headers={
-                        "X-RapidAPI-Key": RAPIDAPI_KEY,
-                        "X-RapidAPI-Host": api['host']
-                    },
-                    timeout=60.0
-                )
+        # Use instagram-reels-downloader-api (working API)
+        try:
+            logger.info("Trying instagram-reels-downloader-api...")
+            response = await client.get(
+                "https://instagram-reels-downloader-api.p.rapidapi.com/download",
+                params={"url": url},
+                headers={
+                    "X-RapidAPI-Key": RAPIDAPI_KEY,
+                    "X-RapidAPI-Host": "instagram-reels-downloader-api.p.rapidapi.com"
+                },
+                timeout=60.0
+            )
+            
+            logger.info(f"instagram-reels-downloader-api response: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"API response success: {data.get('success')}")
                 
-                logger.info(f"{api['host']} response: {response.status_code}")
-                
-                if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        logger.info(f"API response: {json.dumps(data)[:500]}")
+                if data.get("success") and data.get("data", {}).get("medias"):
+                    medias = data["data"]["medias"]
+                    
+                    # Try to find audio-only track first (better for transcription)
+                    audio_url = None
+                    video_url = None
+                    
+                    for media in medias:
+                        if media.get("is_audio") and media.get("type") == "audio":
+                            audio_url = media.get("url")
+                            logger.info(f"Found audio track: {audio_url[:100]}...")
+                            break
+                        elif media.get("type") == "video" and media.get("url"):
+                            video_url = media.get("url")
+                    
+                    # Download audio or video
+                    download_url = audio_url or video_url
+                    if download_url:
+                        logger.info(f"Downloading media from: {download_url[:100]}...")
+                        media_response = await client.get(download_url, follow_redirects=True, timeout=60.0)
                         
-                        # Try to extract video URL from various response formats
-                        video_url = None
-                        
-                        if isinstance(data, dict):
-                            # Direct keys
-                            for key in api['video_keys']:
-                                if data.get(key) and str(data.get(key)).startswith("http"):
-                                    video_url = data[key]
-                                    break
-                            
-                            # Nested in 'data', 'result', 'response', 'media'
-                            if not video_url:
-                                for nested_key in ["data", "result", "response", "media", "video"]:
-                                    nested = data.get(nested_key)
-                                    if isinstance(nested, dict):
-                                        for key in api['video_keys']:
-                                            if nested.get(key) and str(nested.get(key)).startswith("http"):
-                                                video_url = nested[key]
-                                                break
-                                    elif isinstance(nested, list) and len(nested) > 0:
-                                        first = nested[0] if isinstance(nested[0], dict) else {}
-                                        for key in api['video_keys']:
-                                            if first.get(key) and str(first.get(key)).startswith("http"):
-                                                video_url = first[key]
-                                                break
-                                        # Also check if list item is directly a URL
-                                        if not video_url and isinstance(nested[0], str) and nested[0].startswith("http"):
-                                            video_url = nested[0]
-                                    elif isinstance(nested, str) and nested.startswith("http"):
-                                        video_url = nested
-                                    if video_url:
-                                        break
-                        
-                        if video_url:
-                            logger.info(f"Found video URL: {video_url[:100]}...")
-                            
-                            # Download the video
-                            video_response = await client.get(video_url, follow_redirects=True, timeout=60.0)
-                            
-                            if video_response.status_code == 200 and len(video_response.content) > 5000:
+                        if media_response.status_code == 200 and len(media_response.content) > 1000:
+                            if audio_url:
+                                # Save as audio directly
+                                audio_path = os.path.join(output_dir, "audio.m4a")
+                                with open(audio_path, "wb") as f:
+                                    f.write(media_response.content)
+                                logger.info(f"Audio saved: {audio_path}, size: {len(media_response.content)} bytes")
+                                return audio_path
+                            else:
+                                # Save video and extract audio
                                 video_path = os.path.join(output_dir, "video.mp4")
                                 audio_path = os.path.join(output_dir, "audio.mp3")
                                 
                                 with open(video_path, "wb") as f:
-                                    f.write(video_response.content)
-                                logger.info(f"Video saved: {video_path}, size: {len(video_response.content)} bytes")
+                                    f.write(media_response.content)
+                                logger.info(f"Video saved: {video_path}, size: {len(media_response.content)} bytes")
                                 
                                 # Extract audio using ffmpeg
                                 import subprocess
                                 try:
-                                    result = subprocess.run(
+                                    subprocess.run(
                                         ["ffmpeg", "-i", video_path, "-vn", "-acodec", "libmp3lame", "-q:a", "4", audio_path, "-y"],
                                         capture_output=True,
                                         timeout=30
@@ -228,30 +183,26 @@ async def extract_audio_instagram(url: str, output_dir: str) -> str:
                                     if os.path.exists(audio_path) and os.path.getsize(audio_path) > 1000:
                                         logger.info(f"Audio extracted: {audio_path}")
                                         return audio_path
-                                    else:
-                                        # If audio extraction fails, use video file directly
-                                        logger.warning(f"Audio extraction failed, using video file")
-                                        return video_path
                                 except Exception as e:
                                     logger.warning(f"FFmpeg error: {e}")
-                                    return video_path
-                            else:
-                                logger.warning(f"Failed to download video: status={video_response.status_code}, size={len(video_response.content)}")
+                                return video_path
                         else:
-                            logger.warning(f"No video URL found in response from {api['host']}")
-                            
-                    except json.JSONDecodeError:
-                        logger.warning(f"Invalid JSON from {api['host']}: {response.text[:200]}")
-                        
-                elif response.status_code == 403:
-                    logger.warning(f"{api['host']}: Not subscribed (403)")
+                            logger.warning(f"Failed to download media: status={media_response.status_code}")
+                    else:
+                        logger.warning("No media URL found in response")
                 else:
-                    logger.warning(f"{api['host']}: HTTP {response.status_code} - {response.text[:200]}")
+                    error_msg = data.get("message", "Unknown error")
+                    logger.warning(f"API error: {error_msg}")
                     
-            except Exception as e:
-                logger.warning(f"{api['host']} failed: {e}")
+            elif response.status_code == 403:
+                logger.warning("instagram-reels-downloader-api: Not subscribed (403)")
+            else:
+                logger.warning(f"instagram-reels-downloader-api: HTTP {response.status_code} - {response.text[:200]}")
+                
+        except Exception as e:
+            logger.warning(f"instagram-reels-downloader-api failed: {e}")
         
-        raise Exception("Could not download Instagram Reel. You may need to subscribe to an Instagram API on RapidAPI. Try: instagram120, instagram-video-downloader13, or instagram-downloader38.")
+        raise Exception("Could not download Instagram Reel. Please make sure the reel is public and try again.")
 
 def extract_youtube_video_id(url: str) -> Optional[str]:
     """Extract video ID from various YouTube URL formats"""
