@@ -172,6 +172,26 @@ def test_check_endpoint_valid_url():
         log_test("Valid YouTube URL", "FAIL", f"Exception: {str(e)}")
         return False
 
+def test_missing_body():
+    """Test: POST /api/check with missing body"""
+    print("🔍 Testing Missing Request Body...")
+    try:
+        response = requests.post(
+            f"{BACKEND_BASE_URL}/check", 
+            timeout=10
+        )
+        
+        if response.status_code in [400, 422]:
+            log_test("Missing Body Validation", "PASS", "Correctly rejects requests with missing body")
+            return True
+        else:
+            log_test("Missing Body Validation", "FAIL", f"Expected 400/422, got {response.status_code}: {response.text}")
+            return False
+            
+    except Exception as e:
+        log_test("Missing Body Validation", "FAIL", f"Exception: {str(e)}")
+        return False
+
 def test_check_endpoint_invalid_url():
     """Test 3: POST /api/check with invalid URL"""
     print("🔍 Testing Invalid URL...")
