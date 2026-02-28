@@ -13,7 +13,6 @@ import json
 import re
 import httpx
 from groq import Groq
-import yt_dlp
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -26,6 +25,7 @@ db = client[os.environ.get('DB_NAME', 'sachcheck_db')]
 # API Keys
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
 SARVAM_API_KEY = os.environ.get('SARVAM_API_KEY')
+RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY')
 
 # Initialize Groq client
 groq_client = Groq(api_key=GROQ_API_KEY)
@@ -87,38 +87,67 @@ def validate_url(url: str) -> bool:
     ]
     return any(re.search(pattern, url) for pattern in patterns)
 
-def extract_audio(url: str, output_dir: str) -> str:
-    """Extract audio from video URL using yt-dlp"""
-    output_path = os.path.join(output_dir, 'audio')
+def is_youtube_url(url: str) -> bool:
+    """Check if URL is from YouTube"""
+    return bool(re.search(r'(youtube\.com|youtu\.be)', url))
+
+def is_instagram_url(url: str) -> bool:
+    """Check if URL is from Instagram"""
+    return bool(re.search(r'(instagram\.com|instagr\.am)', url))
+
+def extract_youtube_video_id(url: str) -> Optional[str]:
+    """Extract video ID from various YouTube URL formats"""
+    patterns = [
+        r'(?:youtube\.com/shorts/)([a-zA-Z0-9_-]{11})',
+        r'(?:youtube\.com/watch\?v=)([a-zA-Z0-9_-]{11})',
+        r'(?:youtu\.be/)([a-zA-Z0-9_-]{11})',
+        r'(?:youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
+        r'(?:youtube\.com/v/)([a-zA-Z0-9_-]{11})',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
+    """Extract audio from YouTube using RapidAPI"""
+    logger.info(f"Fetching audio via RapidAPI for video ID: {video_id}")
     
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': output_path,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '64',
-        }],
-        'max_filesize': 25 * 1024 * 1024,
-        'socket_timeout': 30,
-        'quiet': True,
-        'no_warnings': True,
-        # Add JavaScript runtime support for YouTube
-        'js_runtimes': {'node': {}},
-        'remote_components': ['ejs:github'],
-    }
-    
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            duration = info.get('duration', 0)
-            if duration > 300:  # 5 minutes max
-                raise ValueError("Video too long (max 5 minutes)")
-    except Exception as e:
-        logger.error(f"yt-dlp error: {e}")
-        raise
-    
-    return output_path + ".mp3"
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        # Try youtube-mp36 API first
+        response = await client.get(
+            f"https://youtube-mp36.p.rapidapi.com/dl",
+            params={"id": video_id},
+            headers={
+                "X-RapidAPI-Key": RAPIDAPI_KEY,
+                "X-RapidAPI-Host": "youtube-mp36.p.rapidapi.com"
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            logger.info(f"RapidAPI response: {data}")
+            
+            if data.get("status") == "ok" and data.get("link"):
+                # Download the MP3 file
+                mp3_url = data["link"]
+                logger.info(f"Downloading MP3 from: {mp3_url}")
+                
+                mp3_response = await client.get(mp3_url, follow_redirects=True)
+                if mp3_response.status_code == 200:
+                    output_path = os.path.join(output_dir, "audio.mp3")
+                    with open(output_path, "wb") as f:
+                        f.write(mp3_response.content)
+                    logger.info(f"Audio saved to: {output_path}")
+                    return output_path
+                else:
+                    raise Exception(f"Failed to download MP3: {mp3_response.status_code}")
+            else:
+                error_msg = data.get("msg", "Unknown error from RapidAPI")
+                raise Exception(f"RapidAPI error: {error_msg}")
+        else:
+            raise Exception(f"RapidAPI request failed: {response.status_code} - {response.text}")
 
 def transcribe_audio(audio_path: str) -> str:
     """Transcribe audio using Groq Whisper"""
@@ -212,8 +241,8 @@ async def synthesize_speech(text: str, language_code: str) -> Optional[str]:
                 json={
                     "inputs": [text],
                     "target_language_code": language_code,
-                    "speaker": "priya",  # Use valid speaker for bulbul:v3
-                    "model": "bulbul:v3",  # Use latest model version
+                    "speaker": "meera",
+                    "model": "bulbul:v1",
                     "pace": 1.0,
                     "enable_preprocessing": True
                 },
@@ -248,6 +277,13 @@ async def check_claim(request: CheckRequest):
             detail={"error": "invalid_url", "message": "Please provide a valid Instagram or YouTube link."}
         )
     
+    # Check if it's Instagram (not supported via RapidAPI yet)
+    if is_instagram_url(url):
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "instagram_not_supported", "message": "Instagram reels are not supported yet. Please try a YouTube Shorts link instead."}
+        )
+    
     # Validate language code
     if language_code not in LANGUAGE_MAP:
         language_code = "hi-IN"  # Default to Hindi
@@ -260,12 +296,22 @@ async def check_claim(request: CheckRequest):
     
     logger.info(f"Processing URL: {url} with language: {language_code}")
     
+    # Extract video ID for YouTube
+    video_id = extract_youtube_video_id(url)
+    if not video_id:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_youtube_url", "message": "Could not extract video ID from the YouTube URL."}
+        )
+    
+    logger.info(f"Extracted video ID: {video_id}")
+    
     # Create temp directory for audio
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
-            # Step 1: Extract audio
-            logger.info("Extracting audio...")
-            audio_path = extract_audio(url, temp_dir)
+            # Step 1: Extract audio via RapidAPI
+            logger.info("Extracting audio via RapidAPI...")
+            audio_path = await extract_audio_rapidapi(video_id, temp_dir)
             
             # Step 2: Transcribe
             logger.info("Transcribing audio...")
@@ -304,12 +350,6 @@ async def check_claim(request: CheckRequest):
             
         except HTTPException:
             raise
-        except yt_dlp.utils.DownloadError as e:
-            logger.error(f"Download error: {e}")
-            raise HTTPException(
-                status_code=422,
-                detail={"error": "could_not_fetch", "message": "Could not extract audio from this link. The reel may be private or unavailable."}
-            )
         except Exception as e:
             logger.error(f"Processing error: {e}")
             raise HTTPException(
