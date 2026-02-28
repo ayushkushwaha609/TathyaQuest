@@ -114,35 +114,63 @@ async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
     """Extract audio from YouTube using RapidAPI"""
     logger.info(f"Fetching audio via RapidAPI for video ID: {video_id}")
     
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        # Try youtube-mp36 API first
-        response = await client.get(
-            f"https://youtube-mp36.p.rapidapi.com/dl",
-            params={"id": video_id},
-            headers={
-                "X-RapidAPI-Key": RAPIDAPI_KEY,
-                "X-RapidAPI-Host": "youtube-mp36.p.rapidapi.com"
-            }
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            logger.info(f"RapidAPI response: {data}")
+    max_retries = 10
+    retry_delay = 3  # seconds
+    
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        for attempt in range(max_retries):
+            # Try youtube-mp36 API
+            response = await client.get(
+                f"https://youtube-mp36.p.rapidapi.com/dl",
+                params={"id": video_id},
+                headers={
+                    "X-RapidAPI-Key": RAPIDAPI_KEY,
+                    "X-RapidAPI-Host": "youtube-mp36.p.rapidapi.com"
+                }
+            )
             
-            if data.get("status") == "ok" and data.get("link"):
-                # Download the MP3 file
-                mp3_url = data["link"]
-                logger.info(f"Downloading MP3 from: {mp3_url}")
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"RapidAPI response (attempt {attempt + 1}): {data}")
                 
-                mp3_response = await client.get(mp3_url, follow_redirects=True)
-                if mp3_response.status_code == 200:
-                    output_path = os.path.join(output_dir, "audio.mp3")
-                    with open(output_path, "wb") as f:
-                        f.write(mp3_response.content)
-                    logger.info(f"Audio saved to: {output_path}")
-                    return output_path
+                status = data.get("status", "").lower()
+                
+                if status == "ok" and data.get("link"):
+                    # Download the MP3 file
+                    mp3_url = data["link"]
+                    logger.info(f"Downloading MP3 from: {mp3_url}")
+                    
+                    mp3_response = await client.get(mp3_url, follow_redirects=True, timeout=60.0)
+                    if mp3_response.status_code == 200:
+                        output_path = os.path.join(output_dir, "audio.mp3")
+                        with open(output_path, "wb") as f:
+                            f.write(mp3_response.content)
+                        logger.info(f"Audio saved to: {output_path}")
+                        return output_path
+                    else:
+                        raise Exception(f"Failed to download MP3: {mp3_response.status_code}")
+                
+                elif status in ["processing", "in process"]:
+                    # Still processing, wait and retry
+                    logger.info(f"Video still processing, waiting {retry_delay}s... (attempt {attempt + 1}/{max_retries})")
+                    import asyncio
+                    await asyncio.sleep(retry_delay)
+                    continue
+                
+                elif status == "fail" or "error" in str(data).lower():
+                    error_msg = data.get("msg", data.get("message", "Unknown error"))
+                    raise Exception(f"RapidAPI error: {error_msg}")
+                
                 else:
-                    raise Exception(f"Failed to download MP3: {mp3_response.status_code}")
+                    # Unknown status, try again
+                    logger.warning(f"Unknown status: {status}, retrying...")
+                    import asyncio
+                    await asyncio.sleep(retry_delay)
+                    continue
+            else:
+                raise Exception(f"RapidAPI request failed: {response.status_code} - {response.text}")
+        
+        raise Exception("Video processing timed out. Please try again later.")
             else:
                 error_msg = data.get("msg", "Unknown error from RapidAPI")
                 raise Exception(f"RapidAPI error: {error_msg}")
