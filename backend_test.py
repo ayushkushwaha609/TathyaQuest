@@ -338,10 +338,10 @@ def run_all_tests():
     # Test 4: Missing body validation
     results["missing_body"] = test_missing_body()
     
-    # Test 4: Cache functionality (if previous test succeeded)
+    # Test 5: Cache functionality (if previous test succeeded)
     results["cache"] = test_cache_functionality(original_data)
     
-    # Test 5: Language support
+    # Test 6: Language support
     results["language"] = test_language_support()
     
     # Summary
