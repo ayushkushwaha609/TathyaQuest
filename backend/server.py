@@ -104,7 +104,7 @@ def extract_audio(url: str, output_dir: str) -> str:
         'quiet': True,
         'no_warnings': True,
         # Add JavaScript runtime support for YouTube
-        'js_runtimes': ['node'],
+        'js_runtimes': {'node': {}},
         'remote_components': ['ejs:github'],
     }
     
