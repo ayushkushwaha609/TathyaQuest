@@ -160,7 +160,7 @@ def test_check_endpoint_valid_url():
             return False
             
     except requests.Timeout:
-        log_test("Valid YouTube URL", "FAIL", "Request timeout (60s) - Processing took too long")
+        log_test("Valid YouTube URL", "FAIL", "Request timeout (120s) - Processing took too long")
         return False
     except Exception as e:
         log_test("Valid YouTube URL", "FAIL", f"Exception: {str(e)}")
