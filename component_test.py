@@ -81,7 +81,7 @@ async def test_sarvam_tts_api():
                 json={
                     "inputs": ["यह एक टेस्ट है"],
                     "target_language_code": "hi-IN",
-                    "speaker": "anushka",
+                    "speaker": "priya",
                     "model": "bulbul:v3",
                     "pace": 1.0,
                     "enable_preprocessing": True
