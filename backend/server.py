@@ -579,8 +579,13 @@ async def check_claim(request: CheckRequest):
                 sources_note=result.get("sources_note", ""),
             )
             
-            # Store in cache
-            cache[cache_key] = response
+            # Store in MongoDB cache
+            cache_doc = response.model_dump()
+            cache_doc["cache_key"] = cache_key
+            cache_doc["url"] = url
+            cache_doc["language_code"] = language_code
+            cache_doc["created_at"] = datetime.now(timezone.utc).isoformat()
+            await checks_collection.insert_one(cache_doc)
             
             return response
             
