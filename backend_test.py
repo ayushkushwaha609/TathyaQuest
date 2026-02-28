@@ -14,7 +14,7 @@ import os
 BACKEND_BASE_URL = "https://mobile-project-draft.preview.emergentagent.com/api"
 
 # Test data
-TEST_YOUTUBE_URL = "https://www.youtube.com/shorts/1xRqM-kKxXM"
+TEST_YOUTUBE_URL = "https://www.youtube.com/shorts/8kbFtUmgGuQ"
 INVALID_URL = "https://example.com/not-a-video"
 SUPPORTED_LANGUAGES = ["hi-IN", "ta-IN", "te-IN", "kn-IN", "ml-IN", "mr-IN"]
 
