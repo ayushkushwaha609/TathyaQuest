@@ -1,6 +1,6 @@
-# SachCheck — Free Deployment Guide
+# SACH — Free Deployment Guide
 
-This guide helps you deploy SachCheck for **$0/month** using:
+This guide helps you deploy SACH for **$0/month** using:
 - **Cloudflare Pages** (frontend)
 - **Render** (backend)
 - **MongoDB Atlas** (database)
@@ -31,7 +31,7 @@ This guide helps you deploy SachCheck for **$0/month** using:
 3. Click **New** → **Web Service**
 4. Connect your GitHub repo
 5. Configure:
-   - **Name**: `sachcheck-api`
+   - **Name**: `sach-api`
    - **Region**: Singapore (or closest to you)
    - **Root Directory**: `backend`
    - **Runtime**: Docker
@@ -46,8 +46,8 @@ This guide helps you deploy SachCheck for **$0/month** using:
    ```
 7. Click **Create Web Service**
 8. Wait for the build to complete (~3-5 min)
-9. Your backend URL will be: `https://sachcheck-api.onrender.com`
-10. Test it: visit `https://sachcheck-api.onrender.com/api/health`
+9. Your backend URL will be: `https://sach-api.onrender.com`
+10. Test it: visit `https://sach-api.onrender.com/api/health`
 
 > **Note**: Render free tier sleeps after 15 min of inactivity. First request after sleep takes ~30s.
 
@@ -61,7 +61,7 @@ This guide helps you deploy SachCheck for **$0/month** using:
 2. Click **Create a project** → **Connect to Git**
 3. Select your GitHub repo
 4. Configure build settings:
-   - **Project name**: `sachcheck`
+   - **Project name**: `sach`
    - **Production branch**: `main`
    - **Root directory**: `frontend`
    - **Build command**: `npx expo export --platform web`
@@ -69,11 +69,11 @@ This guide helps you deploy SachCheck for **$0/month** using:
    - **Node version**: `20` (set in Environment Variables: `NODE_VERSION` = `20`)
 5. Add **Environment Variables**:
    ```
-   EXPO_PUBLIC_BACKEND_URL = https://sachcheck-api.onrender.com
+   EXPO_PUBLIC_BACKEND_URL = https://sach-api.onrender.com
    NODE_VERSION = 20
    ```
 6. Click **Save and Deploy**
-7. Your app will be live at: `https://sachcheck.pages.dev`
+7. Your app will be live at: `https://sach.pages.dev`
 
 ---
 
@@ -118,11 +118,11 @@ To create a shareable Android APK:
  User (Mobile/Web)
        |
        v
- Cloudflare Pages (sachcheck.pages.dev)
+ Cloudflare Pages (sach.pages.dev)
    [Expo Web App - Static Files]
        |
        v  (API calls to /api/*)
- Render (sachcheck-api.onrender.com)
+ Render (sach-api.onrender.com)
    [FastAPI Backend]
        |
        +---> MongoDB Atlas (cache)
