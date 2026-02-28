@@ -53,7 +53,7 @@ export default function HomeScreen() {
               <Ionicons name="shield-checkmark" size={48} color="#10B981" />
             </View>
             <Text style={styles.appName}>Tathya</Text>
-            <Text style={styles.taglineHindi}>सच चेक</Text>
+            <Text style={styles.taglineHindi}>तथ्य</Text>
             <Text style={styles.tagline}>Share a reel. Hear the truth.</Text>
           </View>
 
