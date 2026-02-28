@@ -72,8 +72,12 @@ def test_check_endpoint_valid_url():
         if response.status_code == 200:
             data = response.json()
             
-            # Validate response structure
-            required_fields = ["claim", "verdict", "confidence", "reason", "verdict_text"]
+            # Validate response structure - ALL enhanced context fields must be present
+            required_fields = [
+                "claim", "verdict", "confidence", "reason", "verdict_text", 
+                "audio_base64", "category", "key_points", "fact_details", 
+                "what_to_know", "sources_note"
+            ]
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
