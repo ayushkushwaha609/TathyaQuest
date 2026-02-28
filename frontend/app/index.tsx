@@ -228,6 +228,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#374151',
   },
+  inputContainerHighlight: {
+    borderColor: '#10B981',
+    borderWidth: 2,
+  },
   inputIcon: {
     marginRight: 12,
   },
