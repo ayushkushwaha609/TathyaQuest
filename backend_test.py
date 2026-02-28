@@ -64,7 +64,7 @@ def test_check_endpoint_valid_url():
         response = requests.post(
             f"{BACKEND_BASE_URL}/check", 
             json=payload, 
-            timeout=60  # Extended timeout for processing
+            timeout=120  # Extended timeout for processing as specified in review request
         )
         
         print(f"   Response status: {response.status_code}")
