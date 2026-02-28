@@ -107,6 +107,8 @@ user_problem_statement: |
   User shares an Instagram or YouTube reel link about food/health. 
   The app extracts the video's audio, transcribes it, fact-checks the health claims using an LLM, 
   and reads the verdict aloud in the user's regional Indian language using Sarvam AI's voice model.
+  
+  Production API testing at: https://claim-check.preview.emergentagent.com
 
 backend:
   - task: "Health endpoint"
