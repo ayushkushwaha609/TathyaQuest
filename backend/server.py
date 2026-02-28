@@ -96,6 +96,145 @@ def is_instagram_url(url: str) -> bool:
     """Check if URL is from Instagram"""
     return bool(re.search(r'(instagram\.com|instagr\.am)', url))
 
+def extract_instagram_reel_url(url: str) -> Optional[str]:
+    """Extract and normalize Instagram Reel URL"""
+    # Match various Instagram Reel URL formats
+    patterns = [
+        r'(instagram\.com/reel/[A-Za-z0-9_-]+)',
+        r'(instagram\.com/reels/[A-Za-z0-9_-]+)',
+        r'(instagram\.com/p/[A-Za-z0-9_-]+)',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return f"https://www.{match.group(1)}/"
+    return url  # Return original URL if no match
+
+async def extract_audio_instagram(url: str, output_dir: str) -> str:
+    """Extract audio from Instagram Reel using RapidAPI"""
+    logger.info(f"Fetching Instagram Reel via RapidAPI: {url}")
+    
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        # Try instagram-reels-downloader6 API
+        logger.info("Trying instagram-reels-downloader6 API...")
+        try:
+            response = await client.get(
+                "https://instagram-reels-downloader6.p.rapidapi.com/download",
+                params={"url": url},
+                headers={
+                    "X-RapidAPI-Key": RAPIDAPI_KEY,
+                    "X-RapidAPI-Host": "instagram-reels-downloader6.p.rapidapi.com"
+                },
+                timeout=60.0
+            )
+            
+            logger.info(f"instagram-reels-downloader6 response: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"Instagram API response: {data}")
+                
+                # Try to get video URL from response
+                video_url = None
+                if isinstance(data, dict):
+                    video_url = data.get("video_url") or data.get("url") or data.get("download_url") or data.get("media")
+                    if not video_url and "data" in data:
+                        video_url = data["data"].get("video_url") or data["data"].get("url")
+                
+                if video_url and video_url.startswith("http"):
+                    # Download the video file
+                    logger.info(f"Downloading Instagram video from: {video_url[:100]}...")
+                    video_response = await client.get(video_url, follow_redirects=True, timeout=60.0)
+                    
+                    if video_response.status_code == 200 and len(video_response.content) > 1000:
+                        # Save as video first, then extract audio with ffmpeg
+                        video_path = os.path.join(output_dir, "video.mp4")
+                        audio_path = os.path.join(output_dir, "audio.mp3")
+                        
+                        with open(video_path, "wb") as f:
+                            f.write(video_response.content)
+                        logger.info(f"Video saved: {video_path}, size: {len(video_response.content)} bytes")
+                        
+                        # Extract audio using ffmpeg
+                        import subprocess
+                        try:
+                            result = subprocess.run(
+                                ["ffmpeg", "-i", video_path, "-vn", "-acodec", "libmp3lame", "-q:a", "4", audio_path, "-y"],
+                                capture_output=True,
+                                timeout=30
+                            )
+                            if os.path.exists(audio_path) and os.path.getsize(audio_path) > 1000:
+                                logger.info(f"Audio extracted: {audio_path}")
+                                return audio_path
+                            else:
+                                logger.warning(f"FFmpeg extraction failed: {result.stderr.decode()[:200]}")
+                        except Exception as e:
+                            logger.warning(f"FFmpeg error: {e}")
+                            # If ffmpeg fails, try using the video file directly for transcription
+                            return video_path
+                    else:
+                        logger.warning(f"Failed to download Instagram video: {video_response.status_code}")
+                else:
+                    logger.warning(f"No valid video URL in response: {data}")
+                    
+        except Exception as e:
+            logger.warning(f"instagram-reels-downloader6 failed: {e}")
+        
+        # Try alternative API: instagram-reels-downloader2
+        logger.info("Trying instagram-reels-downloader2 API...")
+        try:
+            response = await client.get(
+                "https://instagram-reels-downloader2.p.rapidapi.com/reels",
+                params={"url": url},
+                headers={
+                    "X-RapidAPI-Key": RAPIDAPI_KEY,
+                    "X-RapidAPI-Host": "instagram-reels-downloader2.p.rapidapi.com"
+                },
+                timeout=60.0
+            )
+            
+            logger.info(f"instagram-reels-downloader2 response: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"Instagram API2 response: {data}")
+                
+                video_url = None
+                if isinstance(data, dict):
+                    video_url = data.get("video") or data.get("video_url") or data.get("url")
+                    if not video_url and "result" in data:
+                        video_url = data["result"].get("video") or data["result"].get("url")
+                
+                if video_url and video_url.startswith("http"):
+                    logger.info(f"Downloading from API2: {video_url[:100]}...")
+                    video_response = await client.get(video_url, follow_redirects=True, timeout=60.0)
+                    
+                    if video_response.status_code == 200 and len(video_response.content) > 1000:
+                        video_path = os.path.join(output_dir, "video.mp4")
+                        audio_path = os.path.join(output_dir, "audio.mp3")
+                        
+                        with open(video_path, "wb") as f:
+                            f.write(video_response.content)
+                        
+                        # Extract audio using ffmpeg
+                        import subprocess
+                        try:
+                            subprocess.run(
+                                ["ffmpeg", "-i", video_path, "-vn", "-acodec", "libmp3lame", "-q:a", "4", audio_path, "-y"],
+                                capture_output=True,
+                                timeout=30
+                            )
+                            if os.path.exists(audio_path) and os.path.getsize(audio_path) > 1000:
+                                return audio_path
+                        except Exception as e:
+                            logger.warning(f"FFmpeg error: {e}")
+                            return video_path
+                            
+        except Exception as e:
+            logger.warning(f"instagram-reels-downloader2 failed: {e}")
+        
+        raise Exception("Could not download Instagram Reel. Please make sure the reel is public and try again.")
+
 def extract_youtube_video_id(url: str) -> Optional[str]:
     """Extract video ID from various YouTube URL formats"""
     patterns = [
