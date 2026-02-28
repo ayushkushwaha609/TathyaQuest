@@ -117,7 +117,6 @@ async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
     
     # Construct full YouTube URL
     youtube_url = f"https://www.youtube.com/watch?v={video_id}"
-    encoded_url = httpx._utils.quote(youtube_url, safe='')
     
     async with httpx.AsyncClient(timeout=90.0) as client:
         # Try youtube-mp310 API (returns direct link as text)
