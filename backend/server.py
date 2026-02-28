@@ -103,6 +103,9 @@ def extract_audio(url: str, output_dir: str) -> str:
         'socket_timeout': 30,
         'quiet': True,
         'no_warnings': True,
+        # Add JavaScript runtime support for YouTube
+        'js_runtimes': ['node'],
+        'remote_components': ['ejs:github'],
     }
     
     try:
