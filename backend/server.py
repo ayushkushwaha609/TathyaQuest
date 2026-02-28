@@ -371,7 +371,7 @@ def fact_check_transcript(transcript: str, language_code: str) -> dict:
     
     lang_key, language_name = LANGUAGE_MAP.get(language_code, ("hindi", "Hindi"))
     
-    system_prompt = """You are an expert health and nutrition fact-checker with deep knowledge of Indian dietary practices and medical science. You are concise and precise.
+    system_prompt = """You are an expert fact-checker with broad knowledge across topics including science, history, current affairs, technology, health, finance, and general knowledge. You verify claims against established facts and scientific consensus. You are concise and precise.
 
 Always return ONLY valid JSON. No explanation outside the JSON object."""
 
@@ -381,14 +381,14 @@ Video transcript:
 {transcript}
 \"\"\"
 
-Analyze the main health or food claim made in this video.
+Analyze the main factual claim made in this video. This could be about any topic - health, science, history, news, technology, etc.
 
 Return ONLY this JSON with no other text:
 {{
-  "claim": "one sentence summary of the main claim",
+  "claim": "one sentence summary of the main factual claim being made",
   "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE",
   "confidence": integer between 0 and 100,
-  "reason": "2-3 sentences max explaining your verdict in simple language",
+  "reason": "2-3 sentences max explaining your verdict with facts/evidence in simple language",
   "verdict_{lang_key}": "The verdict as a natural spoken sentence in {language_name}. Start with the verdict word, then reason briefly. Max 2 sentences."
 }}
 """
