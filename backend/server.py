@@ -33,7 +33,7 @@ RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY')
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 # Create the main app
-app = FastAPI(title="SachCheck API", version="1.0.0")
+app = FastAPI(title="SACH API", version="1.0.0")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")

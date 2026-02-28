@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "SachCheck",
-    "slug": "sachcheck",
+    "name": "SACH",
+    "slug": "sach",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "sachcheck",
+    "scheme": "sach",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sachcheck.app"
+      "bundleIdentifier": "com.sach.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +18,7 @@
         "backgroundColor": "#0F172A"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.sachcheck.app"
+      "package": "com.sach.app"
     },
     "web": {
       "bundler": "metro",

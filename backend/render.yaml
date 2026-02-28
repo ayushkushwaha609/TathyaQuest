@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: sachcheck-api
+    name: sach-api
     runtime: docker
     dockerfilePath: ./Dockerfile
     region: singapore
