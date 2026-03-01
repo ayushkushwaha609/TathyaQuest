@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   Keyboard,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -16,7 +17,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCheckStore } from '../store/useCheckStore';
 import { LanguagePicker } from '../components/LanguagePicker';
 import { LoadingOverlay } from '../components/LoadingOverlay';
-import { useShareIntent } from 'expo-share-intent';
 
 function extractUrl(text: string): string {
   const match = text.match(/https?:\/\/[^\s]+/);
@@ -35,31 +35,40 @@ export default function HomeScreen() {
     runCheck,
   } = useCheckStore();
 
-  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
   const hasHandledShareRef = useRef(false);
 
-  // Handle incoming share intent — auto-fill URL and start fact-check
+  // Handle incoming share intent via Linking (for Android ACTION_SEND)
   useEffect(() => {
-    if (hasShareIntent && shareIntent && !hasHandledShareRef.current) {
-      const sharedText = shareIntent.text || shareIntent.webUrl || '';
-      if (sharedText) {
+    const handleSharedUrl = (sharedText: string) => {
+      if (sharedText && !hasHandledShareRef.current) {
         const cleanUrl = extractUrl(sharedText);
-        setUrl(cleanUrl);
-        hasHandledShareRef.current = true;
-        resetShareIntent();
-        // Auto-trigger fact check after a short delay for state to settle
-        setTimeout(async () => {
+        if (cleanUrl && /(instagram\.com|instagr\.am|youtube\.com|youtu\.be)/i.test(cleanUrl)) {
+          hasHandledShareRef.current = true;
           const store = useCheckStore.getState();
           store.setUrl(cleanUrl);
-          const success = await store.runCheck();
-          if (success) {
-            router.push('/result');
-          }
-          hasHandledShareRef.current = false;
-        }, 300);
+          setTimeout(async () => {
+            const success = await useCheckStore.getState().runCheck();
+            if (success) {
+              router.push('/result');
+            }
+            hasHandledShareRef.current = false;
+          }, 300);
+        }
       }
-    }
-  }, [hasShareIntent, shareIntent]);
+    };
+
+    // Check if app was opened via share
+    Linking.getInitialURL().then((initialUrl) => {
+      if (initialUrl) handleSharedUrl(initialUrl);
+    });
+
+    // Listen for new share intents while app is open
+    const subscription = Linking.addEventListener('url', ({ url: incomingUrl }) => {
+      handleSharedUrl(incomingUrl);
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   const handleCheck = async () => {
     Keyboard.dismiss();
