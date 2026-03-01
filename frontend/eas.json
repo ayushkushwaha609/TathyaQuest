@@ -1,0 +1,22 @@
+{
+  "cli": {
+    "version": ">= 3.0.0"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://tathya-api.onrender.com"
+      }
+    },
+    "production": {
+      "android": {},
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://tathya-api.onrender.com"
+      }
+    }
+  }
+}
