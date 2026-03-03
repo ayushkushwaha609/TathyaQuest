@@ -67,20 +67,26 @@ class CheckRequest(BaseModel):
 
 class CheckResponse(BaseModel):
     claim: str
+    claim_regional: str = ""  # Claim in regional language
     verdict: str
     confidence: int
     reason: str
+    reason_regional: str = ""  # Quick verdict in regional language
     verdict_text: str  # This will now contain both English and regional language
     verdict_text_english: str = ""  # English version
     verdict_text_regional: str = ""  # Regional language version
     audio_base64: Optional[str] = None
     # Enhanced context fields
     category: str = "general"  # health, science, history, technology, finance, news, general
-    key_points: list = []  # Main points extracted from the video
-    fact_details: str = ""  # Detailed explanation of facts
-    what_to_know: str = ""  # What the user should know
+    key_points: list = []  # Main points extracted from the video (English)
+    key_points_regional: list = []  # Key points in regional language
+    fact_details: str = ""  # Detailed explanation of facts (English)
+    fact_details_regional: str = ""  # Facts in regional language
+    what_to_know: str = ""  # What the user should know (English)
+    what_to_know_regional: str = ""  # What to know in regional language
     sources_note: str = ""  # Note about verification sources
     why_misleading: str = ""  # Explanation of why something is misleading (if applicable)
+    why_misleading_regional: str = ""  # Why misleading in regional language
 
 class ErrorResponse(BaseModel):
     error: str
@@ -400,20 +406,28 @@ Video transcript (this is EXACTLY what was said in the video):
 
 TASK: Fact-check ONLY the specific claims made in this transcript. Do not evaluate opinions, predictions, or subjective statements - only verifiable factual claims.
 
+IMPORTANT: Provide ALL content in BOTH English AND {language_name}. This is critical for the bilingual display.
+
 Return ONLY this JSON with no other text:
 {{
-  "claim": "One clear sentence summarizing the main FACTUAL claim being made in the video (quote or paraphrase what was actually said)",
+  "claim": "One clear sentence summarizing the main FACTUAL claim being made in the video (in English)",
+  "claim_{lang_key}": "Same claim translated to {language_name}",
   "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE",
   "confidence": integer between 0 and 100 (use specific numbers like 73, 84, 91 - NOT round numbers),
   "category": "health" or "science" or "history" or "technology" or "finance" or "news" or "general",
-  "key_points": ["Exact point 1 from video", "Exact point 2 from video", "Exact point 3 from video"],
-  "reason": "2-3 sentences explaining your verdict based on OBJECTIVE facts and evidence. Cite specific facts that support or contradict the claim.",
-  "why_misleading": "If verdict is MISLEADING or PARTIALLY_TRUE, explain in 3-4 sentences exactly WHY it is misleading, what information is missing or distorted, and what could lead viewers to wrong conclusions. Leave empty string if verdict is TRUE or FALSE.",
-  "fact_details": "A detailed paragraph (5-6 sentences) explaining the ACTUAL verified facts about this topic. What does science/research/experts actually say? Include specific details, numbers, statistics, or studies if relevant. Be comprehensive.",
-  "what_to_know": "3-4 sentences of practical, actionable advice - what should the viewer actually believe or do based on verified facts? Be specific and helpful.",
-  "sources_note": "Brief note about what type of authoritative sources support the correct information (e.g., 'Based on WHO guidelines', 'According to peer-reviewed research in Journal X', 'Historical records from X show')",
-  "verdict_english": "A comprehensive spoken explanation in English (4-5 sentences). Start with the verdict, explain why, mention key facts, and give practical advice. Make it informative and educational.",
-  "verdict_{lang_key}": "The same comprehensive explanation translated to {language_name} (4-5 sentences). Start with the verdict word in {language_name}, then explain why, mention key facts, and give practical advice. Make it natural and conversational in {language_name}."
+  "key_points": ["Exact point 1 from video in English", "Exact point 2 in English", "Exact point 3 in English"],
+  "key_points_{lang_key}": ["Same point 1 in {language_name}", "Same point 2 in {language_name}", "Same point 3 in {language_name}"],
+  "reason": "2-3 sentences explaining your verdict in English based on OBJECTIVE facts and evidence.",
+  "reason_{lang_key}": "Same explanation translated to {language_name}",
+  "why_misleading": "If verdict is MISLEADING or PARTIALLY_TRUE, explain in 3-4 sentences in English exactly WHY it is misleading. Leave empty string if verdict is TRUE or FALSE.",
+  "why_misleading_{lang_key}": "Same why_misleading explanation in {language_name}. Leave empty string if verdict is TRUE or FALSE.",
+  "fact_details": "A detailed paragraph (4-5 sentences) in English explaining the ACTUAL verified facts about this topic.",
+  "fact_details_{lang_key}": "Same fact_details translated to {language_name}",
+  "what_to_know": "3-4 sentences in English of practical, actionable advice.",
+  "what_to_know_{lang_key}": "Same what_to_know translated to {language_name}",
+  "sources_note": "Brief note in English about authoritative sources",
+  "verdict_english": "A comprehensive spoken explanation in English (4-5 sentences). Start with the verdict, explain why, mention key facts, and give practical advice.",
+  "verdict_{lang_key}": "The same comprehensive explanation in {language_name} (4-5 sentences). Make it natural and conversational."
 }}
 """
 
@@ -424,7 +438,7 @@ Return ONLY this JSON with no other text:
             {"role": "user", "content": user_prompt}
         ],
         temperature=0.2,  # Lower temperature for more consistent, factual responses
-        max_tokens=2000,  # Increased for more elaborate responses
+        max_tokens=3500,  # Increased for bilingual responses
     )
     
     response_text = response.choices[0].message.content.strip()
@@ -455,20 +469,34 @@ Return ONLY this JSON with no other text:
             confidence = confidence + random.choice([-3, -2, -1, 1, 2, 3])
             confidence = max(1, min(99, confidence))  # Keep within bounds
         
+        # Get bilingual fields
+        claim_regional_key = f"claim_{lang_key}"
+        reason_regional_key = f"reason_{lang_key}"
+        key_points_regional_key = f"key_points_{lang_key}"
+        fact_details_regional_key = f"fact_details_{lang_key}"
+        what_to_know_regional_key = f"what_to_know_{lang_key}"
+        why_misleading_regional_key = f"why_misleading_{lang_key}"
+        
         return {
             "claim": result.get("claim", "Could not identify claim"),
+            "claim_regional": result.get(claim_regional_key, ""),
             "verdict": result.get("verdict", "MISLEADING"),
             "confidence": confidence,
             "reason": result.get("reason", "Analysis inconclusive"),
+            "reason_regional": result.get(reason_regional_key, ""),
             "verdict_text": combined_verdict_text,
             "verdict_text_english": verdict_text_english,
             "verdict_text_regional": verdict_text_regional,
             "category": result.get("category", "general"),
             "key_points": result.get("key_points", []),
+            "key_points_regional": result.get(key_points_regional_key, []),
             "fact_details": result.get("fact_details", ""),
+            "fact_details_regional": result.get(fact_details_regional_key, ""),
             "what_to_know": result.get("what_to_know", ""),
+            "what_to_know_regional": result.get(what_to_know_regional_key, ""),
             "sources_note": result.get("sources_note", ""),
-            "why_misleading": result.get("why_misleading", "")
+            "why_misleading": result.get("why_misleading", ""),
+            "why_misleading_regional": result.get(why_misleading_regional_key, "")
         }
     except json.JSONDecodeError as e:
         logger.error(f"JSON parse error: {e}, Response: {response_text}")
@@ -611,19 +639,25 @@ async def check_claim(request: CheckRequest):
             # Build response
             response = CheckResponse(
                 claim=result["claim"],
+                claim_regional=result.get("claim_regional", ""),
                 verdict=result["verdict"],
                 confidence=result["confidence"],
                 reason=result["reason"],
+                reason_regional=result.get("reason_regional", ""),
                 verdict_text=result["verdict_text"],
                 verdict_text_english=result.get("verdict_text_english", ""),
                 verdict_text_regional=result.get("verdict_text_regional", ""),
                 audio_base64=audio_base64,
                 category=result.get("category", "general"),
                 key_points=result.get("key_points", []),
+                key_points_regional=result.get("key_points_regional", []),
                 fact_details=result.get("fact_details", ""),
+                fact_details_regional=result.get("fact_details_regional", ""),
                 what_to_know=result.get("what_to_know", ""),
+                what_to_know_regional=result.get("what_to_know_regional", ""),
                 sources_note=result.get("sources_note", ""),
                 why_misleading=result.get("why_misleading", ""),
+                why_misleading_regional=result.get("why_misleading_regional", ""),
             )
             
             # Store in MongoDB cache

@@ -5,9 +5,11 @@ const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://tathya-api.onren
 
 export interface CheckResult {
   claim: string;
+  claim_regional: string;
   verdict: 'TRUE' | 'FALSE' | 'MISLEADING' | 'PARTIALLY_TRUE';
   confidence: number;
   reason: string;
+  reason_regional: string;
   verdict_text: string;
   verdict_text_english: string;
   verdict_text_regional: string;
@@ -15,10 +17,14 @@ export interface CheckResult {
   // Enhanced context fields
   category: string;
   key_points: string[];
+  key_points_regional: string[];
   fact_details: string;
+  fact_details_regional: string;
   what_to_know: string;
+  what_to_know_regional: string;
   sources_note: string;
   why_misleading: string;
+  why_misleading_regional: string;
 }
 
 interface CheckStore {
