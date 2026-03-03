@@ -406,28 +406,28 @@ Video transcript (this is EXACTLY what was said in the video):
 
 TASK: Fact-check ONLY the specific claims made in this transcript. Do not evaluate opinions, predictions, or subjective statements - only verifiable factual claims.
 
-IMPORTANT: Provide ALL content in BOTH English AND {language_name}. This is critical for the bilingual display.
+IMPORTANT: Provide ALL content in BOTH English AND {language_name}. Keep responses CONCISE to fit within limits.
 
 Return ONLY this JSON with no other text:
 {{
-  "claim": "One clear sentence summarizing the main FACTUAL claim being made in the video (in English)",
-  "claim_{lang_key}": "Same claim translated to {language_name}",
+  "claim": "One clear sentence summarizing the main claim (English)",
+  "claim_{lang_key}": "Same claim in {language_name}",
   "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE",
-  "confidence": integer between 0 and 100 (use specific numbers like 73, 84, 91 - NOT round numbers),
+  "confidence": integer 0-100 (use specific numbers like 73, 84, 91),
   "category": "health" or "science" or "history" or "technology" or "finance" or "news" or "general",
-  "key_points": ["Exact point 1 from video in English", "Exact point 2 in English", "Exact point 3 in English"],
-  "key_points_{lang_key}": ["Same point 1 in {language_name}", "Same point 2 in {language_name}", "Same point 3 in {language_name}"],
-  "reason": "2-3 sentences explaining your verdict in English based on OBJECTIVE facts and evidence.",
-  "reason_{lang_key}": "Same explanation translated to {language_name}",
-  "why_misleading": "If verdict is MISLEADING or PARTIALLY_TRUE, explain in 3-4 sentences in English exactly WHY it is misleading. Leave empty string if verdict is TRUE or FALSE.",
-  "why_misleading_{lang_key}": "Same why_misleading explanation in {language_name}. Leave empty string if verdict is TRUE or FALSE.",
-  "fact_details": "A detailed paragraph (4-5 sentences) in English explaining the ACTUAL verified facts about this topic.",
-  "fact_details_{lang_key}": "Same fact_details translated to {language_name}",
-  "what_to_know": "3-4 sentences in English of practical, actionable advice.",
-  "what_to_know_{lang_key}": "Same what_to_know translated to {language_name}",
-  "sources_note": "Brief note in English about authoritative sources",
-  "verdict_english": "A comprehensive spoken explanation in English (4-5 sentences). Start with the verdict, explain why, mention key facts, and give practical advice.",
-  "verdict_{lang_key}": "The same comprehensive explanation in {language_name} (4-5 sentences). Make it natural and conversational."
+  "key_points": ["Point 1 English", "Point 2 English"],
+  "key_points_{lang_key}": ["Point 1 {language_name}", "Point 2 {language_name}"],
+  "reason": "1-2 sentences explaining verdict in English",
+  "reason_{lang_key}": "Same in {language_name}",
+  "why_misleading": "If MISLEADING/PARTIALLY_TRUE: 1-2 sentences why. Otherwise empty string.",
+  "why_misleading_{lang_key}": "Same in {language_name} or empty string",
+  "fact_details": "2-3 sentences about the actual facts (English)",
+  "fact_details_{lang_key}": "Same in {language_name}",
+  "what_to_know": "1-2 sentences of practical advice (English)",
+  "what_to_know_{lang_key}": "Same in {language_name}",
+  "sources_note": "Brief source note (English only)",
+  "verdict_english": "2-3 sentence spoken explanation in English",
+  "verdict_{lang_key}": "Same 2-3 sentence explanation in {language_name}"
 }}
 """
 
@@ -438,7 +438,7 @@ Return ONLY this JSON with no other text:
             {"role": "user", "content": user_prompt}
         ],
         temperature=0.2,  # Lower temperature for more consistent, factual responses
-        max_tokens=3500,  # Increased for bilingual responses
+        max_tokens=4000,  # Increased for bilingual responses with longer scripts
     )
     
     response_text = response.choices[0].message.content.strip()
@@ -450,6 +450,31 @@ Return ONLY this JSON with no other text:
             response_text = response_text.split("```json")[1].split("```")[0].strip()
         elif "```" in response_text:
             response_text = response_text.split("```")[1].split("```")[0].strip()
+        
+        # Try to repair truncated JSON
+        if not response_text.rstrip().endswith("}"):
+            logger.warning("JSON appears truncated, attempting repair...")
+            # Count open braces and brackets
+            open_braces = response_text.count('{') - response_text.count('}')
+            open_brackets = response_text.count('[') - response_text.count(']')
+            
+            # Check if we're in the middle of a string
+            # Count unescaped quotes
+            in_string = False
+            for i, char in enumerate(response_text):
+                if char == '"' and (i == 0 or response_text[i-1] != '\\'):
+                    in_string = not in_string
+            
+            if in_string:
+                # We're in the middle of a string, close it
+                response_text += '"'
+            
+            # Close any open brackets
+            response_text += ']' * open_brackets
+            # Close any open braces
+            response_text += '}' * open_braces
+            
+            logger.info("Repaired truncated JSON response")
         
         result = json.loads(response_text)
         
@@ -499,21 +524,41 @@ Return ONLY this JSON with no other text:
             "why_misleading_regional": result.get(why_misleading_regional_key, "")
         }
     except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error: {e}, Response: {response_text}")
+        logger.error(f"JSON parse error: {e}, Response: {response_text[:500]}...")
+        
+        # Get the appropriate error message in regional language
+        error_messages = {
+            "hindi": "विश्लेषण विफल",
+            "tamil": "பகுப்பாய்வு தோல்வி",
+            "telugu": "విశ్లేషణ విఫలమైంది",
+            "kannada": "ವಿಶ್ಲೇಷಣೆ ವಿಫಲವಾಗಿದೆ",
+            "malayalam": "വിശകലനം പരാജയപ്പെട്ടു",
+            "marathi": "विश्लेषण अयशस्वी",
+            "bengali": "বিশ্লেষণ ব্যর্থ",
+            "gujarati": "વિશ્લેષણ નિષ્ફળ",
+        }
+        regional_error = error_messages.get(lang_key, "विश्लेषण विफल")
+        
         return {
             "claim": "Could not parse response",
+            "claim_regional": regional_error,
             "verdict": "MISLEADING",
             "confidence": 0,
             "reason": "Failed to analyze the content",
-            "verdict_text": "Analysis failed",
+            "reason_regional": regional_error,
+            "verdict_text": f"Analysis failed\n\n{regional_error}",
             "verdict_text_english": "Analysis failed",
-            "verdict_text_regional": "विश्लेषण विफल",
+            "verdict_text_regional": regional_error,
             "category": "general",
             "key_points": [],
+            "key_points_regional": [],
             "fact_details": "",
+            "fact_details_regional": "",
             "what_to_know": "",
+            "what_to_know_regional": "",
             "sources_note": "",
-            "why_misleading": ""
+            "why_misleading": "",
+            "why_misleading_regional": ""
         }
 
 async def synthesize_speech(text: str, language_code: str) -> Optional[str]:
