@@ -170,11 +170,52 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({ result }) => {
         </View>
       )}
 
-      {/* Verdict in regional language */}
-      <View style={[styles.verdictTextBox, { borderColor: config.color }]}>
-        <Ionicons name="volume-high" size={20} color={config.color} />
-        <Text style={styles.verdictSpeechText}>{result.verdict_text}</Text>
-      </View>
+      {/* Why Misleading - Only show if applicable */}
+      {result.why_misleading && result.why_misleading.trim() !== '' && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="alert-circle" size={16} color="#EF4444" />
+            <Text style={[styles.sectionLabel, { marginLeft: 6, marginBottom: 0 }]}>WHY IS THIS MISLEADING?</Text>
+          </View>
+          <View style={styles.misleadingBox}>
+            <Text style={styles.misleadingText}>{result.why_misleading}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Verdict in English */}
+      {result.verdict_text_english && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="language" size={16} color="#3B82F6" />
+            <Text style={[styles.sectionLabel, { marginLeft: 6, marginBottom: 0 }]}>ANALYSIS (ENGLISH)</Text>
+          </View>
+          <View style={[styles.verdictTextBox, { borderColor: config.color }]}>
+            <Text style={styles.verdictSpeechText}>{result.verdict_text_english}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Verdict in Regional Language */}
+      {result.verdict_text_regional && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="volume-high" size={16} color="#10B981" />
+            <Text style={[styles.sectionLabel, { marginLeft: 6, marginBottom: 0 }]}>ANALYSIS (आपकी भाषा)</Text>
+          </View>
+          <View style={[styles.verdictTextBox, { borderColor: config.color }]}>
+            <Text style={styles.verdictSpeechText}>{result.verdict_text_regional}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Fallback to combined verdict_text if individual fields not available */}
+      {!result.verdict_text_english && !result.verdict_text_regional && result.verdict_text && (
+        <View style={[styles.verdictTextBox, { borderColor: config.color }]}>
+          <Ionicons name="volume-high" size={20} color={config.color} />
+          <Text style={styles.verdictSpeechText}>{result.verdict_text}</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -318,6 +359,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: 'italic',
     flex: 1,
+  },
+  misleadingBox: {
+    backgroundColor: '#7F1D1D',
+    borderRadius: 12,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#EF4444',
+  },
+  misleadingText: {
+    color: '#FEE2E2',
+    fontSize: 15,
+    lineHeight: 24,
   },
   verdictTextBox: {
     flexDirection: 'row',

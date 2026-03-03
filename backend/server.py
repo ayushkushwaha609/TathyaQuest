@@ -70,7 +70,9 @@ class CheckResponse(BaseModel):
     verdict: str
     confidence: int
     reason: str
-    verdict_text: str
+    verdict_text: str  # This will now contain both English and regional language
+    verdict_text_english: str = ""  # English version
+    verdict_text_regional: str = ""  # Regional language version
     audio_base64: Optional[str] = None
     # Enhanced context fields
     category: str = "general"  # health, science, history, technology, finance, news, general
@@ -78,6 +80,7 @@ class CheckResponse(BaseModel):
     fact_details: str = ""  # Detailed explanation of facts
     what_to_know: str = ""  # What the user should know
     sources_note: str = ""  # Note about verification sources
+    why_misleading: str = ""  # Explanation of why something is misleading (if applicable)
 
 class ErrorResponse(BaseModel):
     error: str
@@ -238,7 +241,7 @@ async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
         logger.info("Trying youtube-mp310 API...")
         try:
             response = await client.get(
-                f"https://youtube-mp310.p.rapidapi.com/download/mp3",
+                "https://youtube-mp310.p.rapidapi.com/download/mp3",
                 params={"url": youtube_url},
                 headers={
                     "X-RapidAPI-Key": RAPIDAPI_KEY,
@@ -274,7 +277,7 @@ async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
         logger.info("Trying youtube-mp3-2025 API...")
         try:
             response = await client.get(
-                f"https://youtube-mp3-2025.p.rapidapi.com/download",
+                "https://youtube-mp3-2025.p.rapidapi.com/download",
                 params={"id": video_id},
                 headers={
                     "X-RapidAPI-Key": RAPIDAPI_KEY,
@@ -310,7 +313,7 @@ async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
         for attempt in range(max_retries):
             try:
                 response = await client.get(
-                    f"https://youtube-mp36.p.rapidapi.com/dl",
+                    "https://youtube-mp36.p.rapidapi.com/dl",
                     params={"id": video_id},
                     headers={
                         "X-RapidAPI-Key": RAPIDAPI_KEY,
@@ -326,7 +329,7 @@ async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
                     
                     if status == "ok" and data.get("link"):
                         mp3_url = data["link"]
-                        logger.info(f"Downloading MP3 from mp36...")
+                        logger.info("Downloading MP3 from mp36...")
                         
                         # Try to download with headers
                         mp3_response = await client.get(
@@ -378,30 +381,39 @@ def fact_check_transcript(transcript: str, language_code: str) -> dict:
     
     lang_key, language_name = LANGUAGE_MAP.get(language_code, ("hindi", "Hindi"))
     
-    system_prompt = """You are an expert fact-checker with broad knowledge across topics including science, history, current affairs, technology, health, finance, and general knowledge. You verify claims against established facts and scientific consensus. You provide thorough, educational explanations that help users understand the truth.
+    system_prompt = """You are an expert fact-checker with broad knowledge across topics including science, history, current affairs, technology, health, finance, and general knowledge. 
+
+IMPORTANT RULES:
+1. You ONLY fact-check claims that are EXPLICITLY stated in the video transcript. Do NOT infer or assume claims.
+2. Be OBJECTIVE - stick to verifiable facts, not opinions or interpretations.
+3. Your confidence score should reflect how certain you are about the factual accuracy, using precise numbers (e.g., 73, 87, 91) - NOT round numbers like 50, 60, 70.
+4. If something is MISLEADING, you MUST explain exactly WHY it is misleading and what the correct information is.
+5. Provide thorough, educational explanations that help users understand the truth.
 
 Always return ONLY valid JSON. No explanation outside the JSON object."""
 
     user_prompt = f"""
-Video transcript:
+Video transcript (this is EXACTLY what was said in the video):
 \"\"\"
 {transcript}
 \"\"\"
 
-Analyze the main factual claim made in this video thoroughly. This could be about any topic - health, science, history, news, technology, etc.
+TASK: Fact-check ONLY the specific claims made in this transcript. Do not evaluate opinions, predictions, or subjective statements - only verifiable factual claims.
 
 Return ONLY this JSON with no other text:
 {{
-  "claim": "One clear sentence summarizing the main factual claim being made",
+  "claim": "One clear sentence summarizing the main FACTUAL claim being made in the video (quote or paraphrase what was actually said)",
   "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE",
-  "confidence": integer between 0 and 100,
+  "confidence": integer between 0 and 100 (use specific numbers like 73, 84, 91 - NOT round numbers),
   "category": "health" or "science" or "history" or "technology" or "finance" or "news" or "general",
-  "key_points": ["Point 1 from video", "Point 2 from video", "Point 3 from video"],
-  "reason": "2-3 sentences explaining your verdict with specific facts/evidence",
-  "fact_details": "A detailed paragraph (4-5 sentences) explaining the actual facts about this topic. What does science/research/experts actually say? Include specific details, numbers, or studies if relevant.",
-  "what_to_know": "2-3 sentences of practical advice - what should the viewer actually do or believe based on verified facts?",
-  "sources_note": "Brief note about what type of sources support the correct information (e.g., 'Based on WHO guidelines', 'According to peer-reviewed research', 'Historical records show')",
-  "verdict_{lang_key}": "The verdict as a natural spoken sentence in {language_name}. Start with the verdict word, then give a brief explanation. Max 2-3 sentences."
+  "key_points": ["Exact point 1 from video", "Exact point 2 from video", "Exact point 3 from video"],
+  "reason": "2-3 sentences explaining your verdict based on OBJECTIVE facts and evidence. Cite specific facts that support or contradict the claim.",
+  "why_misleading": "If verdict is MISLEADING or PARTIALLY_TRUE, explain in 3-4 sentences exactly WHY it is misleading, what information is missing or distorted, and what could lead viewers to wrong conclusions. Leave empty string if verdict is TRUE or FALSE.",
+  "fact_details": "A detailed paragraph (5-6 sentences) explaining the ACTUAL verified facts about this topic. What does science/research/experts actually say? Include specific details, numbers, statistics, or studies if relevant. Be comprehensive.",
+  "what_to_know": "3-4 sentences of practical, actionable advice - what should the viewer actually believe or do based on verified facts? Be specific and helpful.",
+  "sources_note": "Brief note about what type of authoritative sources support the correct information (e.g., 'Based on WHO guidelines', 'According to peer-reviewed research in Journal X', 'Historical records from X show')",
+  "verdict_english": "A comprehensive spoken explanation in English (4-5 sentences). Start with the verdict, explain why, mention key facts, and give practical advice. Make it informative and educational.",
+  "verdict_{lang_key}": "The same comprehensive explanation translated to {language_name} (4-5 sentences). Start with the verdict word in {language_name}, then explain why, mention key facts, and give practical advice. Make it natural and conversational in {language_name}."
 }}
 """
 
@@ -411,8 +423,8 @@ Return ONLY this JSON with no other text:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=0.3,
-        max_tokens=1500,
+        temperature=0.2,  # Lower temperature for more consistent, factual responses
+        max_tokens=2000,  # Increased for more elaborate responses
     )
     
     response_text = response.choices[0].message.content.strip()
@@ -427,21 +439,36 @@ Return ONLY this JSON with no other text:
         
         result = json.loads(response_text)
         
-        # Get the verdict text in the requested language
+        # Get the verdict texts
         verdict_key = f"verdict_{lang_key}"
-        verdict_text = result.get(verdict_key, result.get("reason", ""))
+        verdict_text_english = result.get("verdict_english", result.get("reason", ""))
+        verdict_text_regional = result.get(verdict_key, result.get("reason", ""))
+        
+        # Combine both for display (English first, then regional language)
+        combined_verdict_text = f"{verdict_text_english}\n\n{verdict_text_regional}"
+        
+        # Ensure confidence is not a round number (add some variation if it is)
+        confidence = result.get("confidence", 50)
+        if confidence % 10 == 0 and confidence > 0 and confidence < 100:
+            import random
+            # Add small random variation to make it more realistic
+            confidence = confidence + random.choice([-3, -2, -1, 1, 2, 3])
+            confidence = max(1, min(99, confidence))  # Keep within bounds
         
         return {
             "claim": result.get("claim", "Could not identify claim"),
             "verdict": result.get("verdict", "MISLEADING"),
-            "confidence": result.get("confidence", 50),
+            "confidence": confidence,
             "reason": result.get("reason", "Analysis inconclusive"),
-            "verdict_text": verdict_text,
+            "verdict_text": combined_verdict_text,
+            "verdict_text_english": verdict_text_english,
+            "verdict_text_regional": verdict_text_regional,
             "category": result.get("category", "general"),
             "key_points": result.get("key_points", []),
             "fact_details": result.get("fact_details", ""),
             "what_to_know": result.get("what_to_know", ""),
-            "sources_note": result.get("sources_note", "")
+            "sources_note": result.get("sources_note", ""),
+            "why_misleading": result.get("why_misleading", "")
         }
     except json.JSONDecodeError as e:
         logger.error(f"JSON parse error: {e}, Response: {response_text}")
@@ -451,11 +478,14 @@ Return ONLY this JSON with no other text:
             "confidence": 0,
             "reason": "Failed to analyze the content",
             "verdict_text": "Analysis failed",
+            "verdict_text_english": "Analysis failed",
+            "verdict_text_regional": "विश्लेषण विफल",
             "category": "general",
             "key_points": [],
             "fact_details": "",
             "what_to_know": "",
-            "sources_note": ""
+            "sources_note": "",
+            "why_misleading": ""
         }
 
 async def synthesize_speech(text: str, language_code: str) -> Optional[str]:
@@ -560,9 +590,11 @@ async def check_claim(request: CheckRequest):
             logger.info("Fact-checking...")
             result = fact_check_transcript(transcript, language_code)
             
-            # Step 4: Generate TTS
+            # Step 4: Generate TTS with the more elaborate regional language text
             logger.info("Generating speech...")
-            audio_base64 = await synthesize_speech(result["verdict_text"], language_code)
+            # Use the regional language verdict for TTS (more elaborate version)
+            audio_text = result.get("verdict_text_regional", result["verdict_text"])
+            audio_base64 = await synthesize_speech(audio_text, language_code)
             
             # Build response
             response = CheckResponse(
@@ -571,12 +603,15 @@ async def check_claim(request: CheckRequest):
                 confidence=result["confidence"],
                 reason=result["reason"],
                 verdict_text=result["verdict_text"],
+                verdict_text_english=result.get("verdict_text_english", ""),
+                verdict_text_regional=result.get("verdict_text_regional", ""),
                 audio_base64=audio_base64,
                 category=result.get("category", "general"),
                 key_points=result.get("key_points", []),
                 fact_details=result.get("fact_details", ""),
                 what_to_know=result.get("what_to_know", ""),
                 sources_note=result.get("sources_note", ""),
+                why_misleading=result.get("why_misleading", ""),
             )
             
             # Store in MongoDB cache

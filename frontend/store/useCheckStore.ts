@@ -9,6 +9,8 @@ export interface CheckResult {
   confidence: number;
   reason: string;
   verdict_text: string;
+  verdict_text_english: string;
+  verdict_text_regional: string;
   audio_base64: string | null;
   // Enhanced context fields
   category: string;
@@ -16,6 +18,7 @@ export interface CheckResult {
   fact_details: string;
   what_to_know: string;
   sources_note: string;
+  why_misleading: string;
 }
 
 interface CheckStore {
