@@ -258,8 +258,8 @@ agent_communication:
       Test with a health/food related video to see fact-checking in action.
       
       API Keys configured:
-      - GROQ_API_KEY: [REDACTED]
-      - SARVAM_API_KEY: [REDACTED]
+      - GROQ_API_KEY: [REDACTED - rotate this key immediately]
+      - SARVAM_API_KEY: [REDACTED - rotate this key immediately]
   - agent: "testing"
     message: |
       BACKEND TESTING COMPLETE - COMPREHENSIVE RESULTS:

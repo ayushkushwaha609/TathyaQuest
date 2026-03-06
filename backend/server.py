@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Request
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -13,14 +13,19 @@ import json
 import re
 import httpx
 from groq import Groq
-from urllib.parse import quote as url_quote
+from urllib.parse import quote as url_quote, urlparse
 from datetime import datetime, timezone
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ.get('MONGO_URL')
+if not mongo_url:
+    raise RuntimeError("MONGO_URL environment variable is required but not set.")
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'tathya_db')]
 
@@ -32,8 +37,13 @@ RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY')
 # Initialize Groq client
 groq_client = Groq(api_key=GROQ_API_KEY)
 
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 # Create the main app
 app = FastAPI(title="Tathya API", version="1.0.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -62,7 +72,7 @@ LANGUAGE_MAP = {
 
 # Pydantic Models
 class CheckRequest(BaseModel):
-    url: str
+    url: str = Field(..., max_length=2048)
     language_code: str = "hi-IN"
 
 class CheckResponse(BaseModel):
@@ -94,15 +104,21 @@ class ErrorResponse(BaseModel):
 
 # Helper Functions
 def get_cache_key(url: str, language_code: str) -> str:
-    return hashlib.md5(f"{url}:{language_code}".encode()).hexdigest()
+    return hashlib.sha256(f"{url}:{language_code}".encode()).hexdigest()
 
 def validate_url(url: str) -> bool:
-    """Validate if URL is from Instagram or YouTube"""
-    patterns = [
-        r'(instagram\.com|instagr\.am)',
-        r'(youtube\.com|youtu\.be)',
-    ]
-    return any(re.search(pattern, url) for pattern in patterns)
+    """Validate if URL is from Instagram or YouTube by checking the actual hostname"""
+    try:
+        parsed = urlparse(url)
+        hostname = (parsed.hostname or '').lower()
+        allowed_hosts = {
+            'instagram.com', 'www.instagram.com', 'instagr.am',
+            'youtube.com', 'www.youtube.com', 'youtu.be',
+            'm.youtube.com', 'music.youtube.com',
+        }
+        return hostname in allowed_hosts and parsed.scheme in ('http', 'https')
+    except Exception:
+        return False
 
 def is_youtube_url(url: str) -> bool:
     """Check if URL is from YouTube"""
@@ -607,10 +623,11 @@ async def health_check():
     return {"status": "ok"}
 
 @api_router.post("/check", response_model=CheckResponse)
-async def check_claim(request: CheckRequest):
+@limiter.limit("10/minute")
+async def check_claim(request: Request, body: CheckRequest):
     """Main endpoint - fact-check a video URL"""
-    url = request.url.strip()
-    language_code = request.language_code
+    url = body.url.strip()
+    language_code = body.language_code
     
     # Validate URL
     if not validate_url(url):
@@ -721,18 +738,22 @@ async def check_claim(request: CheckRequest):
             logger.error(f"Processing error: {e}")
             raise HTTPException(
                 status_code=500,
-                detail={"error": "processing_error", "message": f"An error occurred while processing: {str(e)}"}
+                detail={"error": "processing_error", "message": "An internal error occurred. Please try again later."}
             )
 
 # Include the router in the main app
 app.include_router(api_router)
 
+# CORS: allow configured origins, or fall back to permissive for mobile clients
+_cors_origins = os.environ.get('CORS_ORIGINS', '*')
+_allow_origins = [o.strip() for o in _cors_origins.split(',')] if _cors_origins != '*' else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=True if _cors_origins != '*' else False,
+    allow_origins=_allow_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 @app.on_event("startup")
