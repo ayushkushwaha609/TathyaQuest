@@ -84,7 +84,7 @@ export default function HomeScreen() {
     };
 
     handleShareIntent();
-  }, [hasShareIntent, shareIntent, isLoading]);
+  }, [hasShareIntent, shareIntent]);
 
   const handleCheck = async () => {
     Keyboard.dismiss();

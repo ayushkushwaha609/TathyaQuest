@@ -51,7 +51,10 @@ export const useCheckStore = create<CheckStore>((set, get) => ({
   setLanguageCode: (code: string) => set({ languageCode: code }),
 
   runCheck: async () => {
-    const { url, languageCode } = get();
+    const { url, languageCode, isLoading } = get();
+
+    // Prevent duplicate requests
+    if (isLoading) return false;
     
     // Validate URL
     const urlPattern = /(instagram\.com|instagr\.am|youtube\.com|youtu\.be)/i;
