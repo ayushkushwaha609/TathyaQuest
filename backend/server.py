@@ -13,6 +13,7 @@ import json
 import re
 import httpx
 from groq import Groq
+from duckduckgo_search import DDGS
 from urllib.parse import quote as url_quote, urlparse
 from datetime import datetime, timezone
 import time
@@ -412,13 +413,45 @@ async def transcribe_audio(audio_path: str) -> str:
             )
     return await asyncio.to_thread(_sync_transcribe)
 
+async def web_search(query: str) -> str:
+    """Search the web using DuckDuckGo for fact-checking context"""
+    try:
+        def _sync_search():
+            with DDGS() as ddgs:
+                return list(ddgs.text(query, max_results=5))
+        results = await asyncio.to_thread(_sync_search)
+        if not results:
+            logger.warning("DuckDuckGo returned no results")
+            return ""
+        snippets = []
+        for r in results:
+            title = r.get("title", "")
+            body = r.get("body", "")
+            href = r.get("href", "")
+            snippets.append(f"- {title}: {body} (Source: {href})")
+        return "\n".join(snippets)
+    except Exception as e:
+        logger.warning(f"DuckDuckGo search failed: {e}")
+        return ""
+
 async def fact_check_transcript(transcript: str, language_code: str) -> dict:
-    """Fact-check the transcript using Groq Llama (offloaded to thread to avoid blocking event loop)"""
+    """Fact-check the transcript using DuckDuckGo Search + Groq Llama"""
     # Truncate transcript to ~1500 tokens
     transcript = transcript[:6000]
     
     lang_key, language_name = LANGUAGE_MAP.get(language_code, ("hindi", "Hindi"))
     
+    # Step 1: Search the web for relevant facts about the transcript's claims
+    search_query = transcript[:300].replace('"', ' ').replace('\n', ' ')
+    web_context = await web_search(f"fact check: {search_query}")
+    
+    web_context_block = ""
+    if web_context:
+        web_context_block = f"""\n\nWEB SEARCH RESULTS (use these to verify claims against current real-world information):
+\"\"\"
+{web_context}
+\"\"\"\n"""
+
     system_prompt = """You are an expert fact-checker with broad knowledge across topics including science, history, current affairs, technology, health, finance, and general knowledge. 
 
 IMPORTANT RULES:
@@ -427,6 +460,8 @@ IMPORTANT RULES:
 3. Your confidence score should reflect how certain you are about the factual accuracy, using precise numbers (e.g., 73, 87, 91) - NOT round numbers like 50, 60, 70.
 4. If something is MISLEADING, you MUST explain exactly WHY it is misleading and what the correct information is.
 5. Provide thorough, educational explanations that help users understand the truth.
+6. USE the web search results provided to verify claims against up-to-date real-world information. Prefer web search evidence over your training data for current events and recent facts.
+7. If web search results contradict a claim, cite the source in your sources_note.
 
 Always return ONLY valid JSON. No explanation outside the JSON object."""
 
@@ -435,8 +470,8 @@ Video transcript (this is EXACTLY what was said in the video):
 \"\"\"
 {transcript}
 \"\"\"
-
-TASK: Fact-check ONLY the specific claims made in this transcript. Do not evaluate opinions, predictions, or subjective statements - only verifiable factual claims.
+{web_context_block}
+TASK: Fact-check ONLY the specific claims made in this transcript. Use the web search results (if available) to verify claims against current real-world information. Do not evaluate opinions, predictions, or subjective statements - only verifiable factual claims.
 
 IMPORTANT: Provide ALL content in BOTH English AND {language_name}. Keep responses CONCISE to fit within limits.
 
