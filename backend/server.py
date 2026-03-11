@@ -37,9 +37,12 @@ GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
 SARVAM_API_KEY = os.environ.get('SARVAM_API_KEY')
 RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY')
 
-# API key rotation — tries each key in order until one works
+# Instagram: multiple keys for rotation (high request volume)
 _keys_env = os.environ.get('RAPIDAPI_KEYS', '')
 RAPIDAPI_KEYS = [k.strip() for k in _keys_env.split(',') if k.strip()] or ([RAPIDAPI_KEY] if RAPIDAPI_KEY else [])
+
+# YouTube: single dedicated key
+RAPIDAPI_KEY_YOUTUBE = os.environ.get('RAPIDAPI_KEY_YOUTUBE', RAPIDAPI_KEY or (RAPIDAPI_KEYS[0] if RAPIDAPI_KEYS else ''))
 
 # Ensure RAPIDAPI_KEY always has a value (fallback to first rotated key)
 if not RAPIDAPI_KEY and RAPIDAPI_KEYS:
@@ -369,28 +372,23 @@ async def _try_youtube_mp36(client, video_id: str, api_key: str, output_dir: str
     return None
 
 async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
-    """Extract audio from YouTube using RapidAPI with key rotation"""
+    """Extract audio from YouTube using dedicated YouTube RapidAPI key"""
     logger.info(f"Fetching audio via RapidAPI for video ID: {video_id}")
     youtube_url = f"https://www.youtube.com/watch?v={video_id}"
     client = await get_http_client()
+    api_key = RAPIDAPI_KEY_YOUTUBE
 
-    # Try each API with each key until one works
-    for i, api_key in enumerate(RAPIDAPI_KEYS):
-        logger.info(f"YouTube: trying key {i+1}/{len(RAPIDAPI_KEYS)}...")
+    result = await _try_youtube_mp310(client, youtube_url, api_key, output_dir)
+    if result:
+        return result
 
-        result = await _try_youtube_mp310(client, youtube_url, api_key, output_dir)
-        if result:
-            return result
+    result = await _try_youtube_mp3_2025(client, video_id, api_key, output_dir)
+    if result:
+        return result
 
-        result = await _try_youtube_mp3_2025(client, video_id, api_key, output_dir)
-        if result:
-            return result
-
-        result = await _try_youtube_mp36(client, video_id, api_key, output_dir)
-        if result:
-            return result
-
-        logger.warning(f"Key {i+1}: all YouTube APIs failed, trying next key...")
+    result = await _try_youtube_mp36(client, video_id, api_key, output_dir)
+    if result:
+        return result
 
     raise Exception("Could not extract audio. Please try a different video.")
 
