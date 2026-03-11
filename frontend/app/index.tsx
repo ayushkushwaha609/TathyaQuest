@@ -44,7 +44,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const handleShareIntent = async () => {
       // Prevent duplicate processing
-      if (!hasShareIntent || isProcessingShareRef.current || isLoading) return;
+      if (!hasShareIntent || isProcessingShareRef.current) return;
 
       // Get shared URL - prefer webUrl (direct URL) over text (may contain non-URL content)
       const sharedText = shareIntent?.webUrl || shareIntent?.text || '';
@@ -60,8 +60,8 @@ export default function HomeScreen() {
       if (cleanUrl && /(instagram\.com|instagr\.am|youtube\.com|youtu\.be)/i.test(cleanUrl)) {
         isProcessingShareRef.current = true;
 
-        // Clear any stale result/error from a previous check before starting new one
-        useCheckStore.setState({ result: null, error: null });
+        // Clear any stale result/error/loading from a previous check before starting new one
+        useCheckStore.setState({ result: null, error: null, isLoading: false });
 
         // Set the URL in store (auto-populate the input field)
         setUrl(cleanUrl);

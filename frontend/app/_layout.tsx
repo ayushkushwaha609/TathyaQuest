@@ -3,14 +3,13 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
-import { useCheckStore } from '../store/useCheckStore';
 
 // Component to handle share intent navigation
 function ShareIntentHandler({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
   const { hasShareIntent } = useShareIntentContext();
-  const { reset } = useCheckStore();
+
   const processingRef = React.useRef(false);
 
   useEffect(() => {
@@ -21,8 +20,9 @@ function ShareIntentHandler({ children }: { children: React.ReactNode }) {
       
       if (currentScreen === 'result') {
         processingRef.current = true;
-        // Reset state and navigate to home - the home screen will handle the share
-        reset();
+        // Navigate to home — do NOT call reset() here because index.tsx is already
+        // mounted and may have already started runCheck. Calling reset() would
+        // increment latestRequestId and cause the in-flight request to be discarded.
         router.replace('/');
         // Allow processing again after a short delay
         setTimeout(() => {
