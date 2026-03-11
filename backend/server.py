@@ -274,139 +274,125 @@ def extract_youtube_video_id(url: str) -> Optional[str]:
             return match.group(1)
     return None
 
-async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
-    """Extract audio from YouTube using RapidAPI"""
-    logger.info(f"Fetching audio via RapidAPI for video ID: {video_id}")
-    
-    # Construct full YouTube URL
-    youtube_url = f"https://www.youtube.com/watch?v={video_id}"
-    
-    client = await get_http_client()
-    if True:  # shared client — no context manager needed
-        # Try youtube-mp310 API first (returns direct link as text)
-        logger.info("Trying youtube-mp310 API...")
+async def _try_youtube_mp310(client, youtube_url: str, api_key: str, output_dir: str) -> str | None:
+    """Try youtube-mp310 API. Returns audio path on success, None on failure."""
+    try:
+        response = await client.get(
+            "https://youtube-mp310.p.rapidapi.com/download/mp3",
+            params={"url": youtube_url},
+            headers={"X-RapidAPI-Key": api_key, "X-RapidAPI-Host": "youtube-mp310.p.rapidapi.com"},
+            timeout=60.0
+        )
+        if response.status_code in (403, 429):
+            return None
+        logger.info(f"youtube-mp310 status: {response.status_code}, body: {response.text[:200]}")
+        if response.status_code == 200:
+            mp3_url = response.text.strip()
+            if mp3_url and mp3_url.startswith("http"):
+                mp3_response = await client.get(mp3_url, follow_redirects=True, timeout=60.0)
+                if mp3_response.status_code == 200 and len(mp3_response.content) > 1000:
+                    output_path = os.path.join(output_dir, "audio.mp3")
+                    with open(output_path, "wb") as f:
+                        f.write(mp3_response.content)
+                    logger.info(f"Audio saved from mp310: {output_path}, size: {len(mp3_response.content)} bytes")
+                    return output_path
+    except Exception as e:
+        logger.warning(f"youtube-mp310 failed: {e}")
+    return None
+
+async def _try_youtube_mp3_2025(client, video_id: str, api_key: str, output_dir: str) -> str | None:
+    """Try youtube-mp3-2025 API. Returns audio path on success, None on failure."""
+    try:
+        response = await client.get(
+            "https://youtube-mp3-2025.p.rapidapi.com/download",
+            params={"id": video_id},
+            headers={"X-RapidAPI-Key": api_key, "X-RapidAPI-Host": "youtube-mp3-2025.p.rapidapi.com"},
+            timeout=60.0
+        )
+        if response.status_code in (403, 429):
+            return None
+        logger.info(f"youtube-mp3-2025 status: {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+            mp3_url = data.get("link") or data.get("download") or data.get("url")
+            if mp3_url and mp3_url.startswith("http"):
+                mp3_response = await client.get(mp3_url, follow_redirects=True, timeout=60.0)
+                if mp3_response.status_code == 200 and len(mp3_response.content) > 1000:
+                    output_path = os.path.join(output_dir, "audio.mp3")
+                    with open(output_path, "wb") as f:
+                        f.write(mp3_response.content)
+                    logger.info(f"Audio saved from mp3-2025: {output_path}")
+                    return output_path
+    except Exception as e:
+        logger.warning(f"youtube-mp3-2025 failed: {e}")
+    return None
+
+async def _try_youtube_mp36(client, video_id: str, api_key: str, output_dir: str) -> str | None:
+    """Try youtube-mp36 API with retry logic. Returns audio path on success, None on failure."""
+    max_retries = 3
+    retry_delay = 5
+    for attempt in range(max_retries):
         try:
             response = await client.get(
-                "https://youtube-mp310.p.rapidapi.com/download/mp3",
-                params={"url": youtube_url},
-                headers={
-                    "X-RapidAPI-Key": RAPIDAPI_KEY,
-                    "X-RapidAPI-Host": "youtube-mp310.p.rapidapi.com"
-                },
-                timeout=60.0
-            )
-            
-            logger.info(f"youtube-mp310 response status: {response.status_code}, body: {response.text[:200]}")
-            
-            if response.status_code == 200:
-                mp3_url = response.text.strip()
-                
-                if mp3_url and mp3_url.startswith("http"):
-                    # Download the MP3 file
-                    logger.info(f"Downloading MP3 from mp310: {mp3_url[:100]}...")
-                    mp3_response = await client.get(mp3_url, follow_redirects=True, timeout=60.0)
-                    if mp3_response.status_code == 200 and len(mp3_response.content) > 1000:
-                        output_path = os.path.join(output_dir, "audio.mp3")
-                        with open(output_path, "wb") as f:
-                            f.write(mp3_response.content)
-                        logger.info(f"Audio saved from mp310: {output_path}, size: {len(mp3_response.content)} bytes")
-                        return output_path
-                    else:
-                        logger.warning(f"Failed to download MP3 from mp310: status={mp3_response.status_code}, size={len(mp3_response.content)}")
-                else:
-                    logger.warning(f"Invalid MP3 URL from mp310: {mp3_url[:100]}")
-                    
-        except Exception as e:
-            logger.warning(f"youtube-mp310 API failed: {e}")
-        
-        # Try youtube-mp3-2025 API
-        logger.info("Trying youtube-mp3-2025 API...")
-        try:
-            response = await client.get(
-                "https://youtube-mp3-2025.p.rapidapi.com/download",
+                "https://youtube-mp36.p.rapidapi.com/dl",
                 params={"id": video_id},
-                headers={
-                    "X-RapidAPI-Key": RAPIDAPI_KEY,
-                    "X-RapidAPI-Host": "youtube-mp3-2025.p.rapidapi.com"
-                },
-                timeout=60.0
+                headers={"X-RapidAPI-Key": api_key, "X-RapidAPI-Host": "youtube-mp36.p.rapidapi.com"},
             )
-            
-            logger.info(f"youtube-mp3-2025 response: {response.status_code}")
-            
+            if response.status_code in (403, 429):
+                return None
             if response.status_code == 200:
                 data = response.json()
-                logger.info(f"youtube-mp3-2025 data: {data}")
-                
-                mp3_url = data.get("link") or data.get("download") or data.get("url")
-                if mp3_url and mp3_url.startswith("http"):
-                    mp3_response = await client.get(mp3_url, follow_redirects=True, timeout=60.0)
+                status = data.get("status", "").lower()
+                logger.info(f"youtube-mp36 attempt {attempt + 1}: status={status}")
+                if status == "ok" and data.get("link"):
+                    mp3_url = data["link"]
+                    mp3_response = await client.get(
+                        mp3_url, follow_redirects=True, timeout=60.0,
+                        headers={
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                            "Referer": "https://youtube-mp36.p.rapidapi.com/"
+                        }
+                    )
                     if mp3_response.status_code == 200 and len(mp3_response.content) > 1000:
                         output_path = os.path.join(output_dir, "audio.mp3")
                         with open(output_path, "wb") as f:
                             f.write(mp3_response.content)
-                        logger.info(f"Audio saved from mp3-2025: {output_path}")
+                        logger.info(f"Audio saved from mp36: {output_path}")
                         return output_path
-                        
+                elif status in ["processing", "in process"]:
+                    logger.info(f"Video processing, waiting {retry_delay}s...")
+                    await asyncio.sleep(retry_delay)
+                    continue
         except Exception as e:
-            logger.warning(f"youtube-mp3-2025 API failed: {e}")
-        
-        # Fallback to youtube-mp36 API with retry logic
-        logger.info("Trying youtube-mp36 API as fallback...")
-        max_retries = 5
-        retry_delay = 5
-        
-        for attempt in range(max_retries):
-            try:
-                response = await client.get(
-                    "https://youtube-mp36.p.rapidapi.com/dl",
-                    params={"id": video_id},
-                    headers={
-                        "X-RapidAPI-Key": RAPIDAPI_KEY,
-                        "X-RapidAPI-Host": "youtube-mp36.p.rapidapi.com"
-                    }
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    logger.info(f"youtube-mp36 response (attempt {attempt + 1}): status={data.get('status')}")
-                    
-                    status = data.get("status", "").lower()
-                    
-                    if status == "ok" and data.get("link"):
-                        mp3_url = data["link"]
-                        logger.info("Downloading MP3 from mp36...")
-                        
-                        # Try to download with headers
-                        mp3_response = await client.get(
-                            mp3_url, 
-                            follow_redirects=True, 
-                            timeout=60.0,
-                            headers={
-                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                                "Referer": "https://youtube-mp36.p.rapidapi.com/"
-                            }
-                        )
-                        if mp3_response.status_code == 200 and len(mp3_response.content) > 1000:
-                            output_path = os.path.join(output_dir, "audio.mp3")
-                            with open(output_path, "wb") as f:
-                                f.write(mp3_response.content)
-                            logger.info(f"Audio saved from mp36: {output_path}")
-                            return output_path
-                        else:
-                            logger.warning(f"mp36 download failed: status={mp3_response.status_code}")
-                    
-                    elif status in ["processing", "in process"]:
-                        logger.info(f"Video processing, waiting {retry_delay}s...")
-                        await asyncio.sleep(retry_delay)
-                        continue
-                    
-            except Exception as e:
-                logger.warning(f"youtube-mp36 attempt {attempt + 1} failed: {e}")
-            
-            await asyncio.sleep(retry_delay)
-        
-        raise Exception("Could not extract audio. Please try a different video.")
+            logger.warning(f"youtube-mp36 attempt {attempt + 1} failed: {e}")
+        await asyncio.sleep(retry_delay)
+    return None
+
+async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
+    """Extract audio from YouTube using RapidAPI with key rotation"""
+    logger.info(f"Fetching audio via RapidAPI for video ID: {video_id}")
+    youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+    client = await get_http_client()
+
+    # Try each API with each key until one works
+    for i, api_key in enumerate(RAPIDAPI_KEYS):
+        logger.info(f"YouTube: trying key {i+1}/{len(RAPIDAPI_KEYS)}...")
+
+        result = await _try_youtube_mp310(client, youtube_url, api_key, output_dir)
+        if result:
+            return result
+
+        result = await _try_youtube_mp3_2025(client, video_id, api_key, output_dir)
+        if result:
+            return result
+
+        result = await _try_youtube_mp36(client, video_id, api_key, output_dir)
+        if result:
+            return result
+
+        logger.warning(f"Key {i+1}: all YouTube APIs failed, trying next key...")
+
+    raise Exception("Could not extract audio. Please try a different video.")
 
 async def transcribe_audio(audio_path: str) -> str:
     """Transcribe audio using Groq Whisper (offloaded to thread to avoid blocking event loop)"""
