@@ -80,6 +80,7 @@ logger = logging.getLogger(__name__)
 
 # Language mapping
 LANGUAGE_MAP = {
+    "en-IN": ("english", "English"),
     "hi-IN": ("hindi", "Hindi"),
     "ta-IN": ("tamil", "Tamil"),
     "te-IN": ("telugu", "Telugu"),
@@ -577,7 +578,11 @@ Return ONLY this JSON with no other text:
         verdict_text_regional = result.get(verdict_key, result.get("reason", ""))
         
         # Combine both for display (English first, then regional language)
-        combined_verdict_text = f"{verdict_text_english}\n\n{verdict_text_regional}"
+        # For English, avoid duplicating the same text twice
+        if lang_key == "english":
+            combined_verdict_text = verdict_text_english
+        else:
+            combined_verdict_text = f"{verdict_text_english}\n\n{verdict_text_regional}"
         
         # Ensure confidence is not a round number (add some variation if it is)
         confidence = int(result.get("confidence", 50))
@@ -621,6 +626,7 @@ Return ONLY this JSON with no other text:
         
         # Get the appropriate error message in regional language
         error_messages = {
+            "english": "Analysis failed",
             "hindi": "विश्लेषण विफल",
             "tamil": "பகுப்பாய்வு தோல்வி",
             "telugu": "విశ్లేషణ విఫలమైంది",

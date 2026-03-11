@@ -5,6 +5,7 @@ export interface Language {
 }
 
 export const LANGUAGES: Language[] = [
+  { label: "English", nativeLabel: "English", value: "en-IN" },
   { label: "Hindi", nativeLabel: "हिंदी", value: "hi-IN" },
   { label: "Tamil", nativeLabel: "தமிழ்", value: "ta-IN" },
   { label: "Telugu", nativeLabel: "తెలుగు", value: "te-IN" },
