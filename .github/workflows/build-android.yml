@@ -35,18 +35,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Debug environment
-        working-directory: frontend/android
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "JAVA_HOME=$JAVA_HOME"
-          which node
-          node --version
-          which java
-          java -version
-          ls -la gradlew
-          head -1 gradlew
-
       - name: Build APK
         working-directory: frontend/android
         env:
