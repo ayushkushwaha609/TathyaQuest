@@ -17,6 +17,7 @@ import { useShareIntentContext } from 'expo-share-intent';
 import { useCheckStore } from '../store/useCheckStore';
 import { LanguagePicker } from '../components/LanguagePicker';
 import { LoadingOverlay } from '../components/LoadingOverlay';
+import { colors } from '../constants/theme';
 
 function extractUrl(text: string): string {
   const match = text.match(/https?:\/\/[^\s]+/);
@@ -33,7 +34,6 @@ export default function HomeScreen() {
     isLoading,
     error,
     runCheck,
-    reset,
   } = useCheckStore();
 
   // Use expo-share-intent context for receiving shared content
@@ -55,7 +55,7 @@ export default function HomeScreen() {
 
       // Extract URL from shared text
       const cleanUrl = extractUrl(sharedText);
-      
+
       // Validate it's from Instagram or YouTube
       if (cleanUrl && /(instagram\.com|instagr\.am|youtube\.com|youtu\.be)/i.test(cleanUrl)) {
         isProcessingShareRef.current = true;
@@ -108,10 +108,10 @@ export default function HomeScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Ionicons name="shield-checkmark" size={48} color="#10B981" />
+              <Ionicons name="scan" size={36} color={colors.saffron} />
             </View>
-            <Text style={styles.appName}>Tathya</Text>
-            <Text style={styles.taglineHindi}>तथ्य</Text>
+            <Text style={styles.appName}>TathyaCheck</Text>
+            <Text style={styles.taglineHindi}>तथ्य की जांच</Text>
             <Text style={styles.tagline}>Share a reel. Hear the truth.</Text>
           </View>
 
@@ -122,13 +122,13 @@ export default function HomeScreen() {
               <Ionicons
                 name="link"
                 size={20}
-                color="#6B7280"
+                color={colors.ashGray}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="Instagram or YouTube link"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={colors.lightGray}
                 value={url}
                 onChangeText={setUrl}
                 autoCapitalize="none"
@@ -137,7 +137,7 @@ export default function HomeScreen() {
               />
               {url.length > 0 && (
                 <TouchableOpacity onPress={() => setUrl('')}>
-                  <Ionicons name="close-circle" size={20} color="#6B7280" />
+                  <Ionicons name="close-circle" size={20} color={colors.lightGray} />
                 </TouchableOpacity>
               )}
             </View>
@@ -145,7 +145,7 @@ export default function HomeScreen() {
             {/* Error Message */}
             {error && (
               <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={16} color="#EF4444" />
+                <Ionicons name="alert-circle" size={16} color={colors.false} />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
@@ -166,13 +166,14 @@ export default function HomeScreen() {
               onPress={handleCheck}
               disabled={!url || isLoading}
             >
-              <Text style={styles.checkButtonText}>Check करो</Text>
-              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+              <Text style={styles.checkButtonText}>Check</Text>
+              <Text style={styles.checkButtonHindi}>जांचें</Text>
+              <Ionicons name="arrow-forward" size={20} color={colors.white} />
             </TouchableOpacity>
 
             {/* Info Text */}
             <View style={styles.infoContainer}>
-              <Ionicons name="information-circle" size={16} color="#6B7280" />
+              <Ionicons name="information-circle" size={16} color={colors.lightGray} />
               <Text style={styles.infoText}>Works with public reels only</Text>
             </View>
           </View>
@@ -203,7 +204,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.cream,
   },
   keyboardView: {
     flex: 1,
@@ -221,52 +222,53 @@ const styles = StyleSheet.create({
   logoContainer: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: '#064E3B',
+    borderRadius: 20,
+    backgroundColor: colors.deepIndigo,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
   appName: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: colors.deepIndigo,
   },
   taglineHindi: {
-    fontSize: 20,
-    color: '#10B981',
+    fontSize: 18,
+    color: colors.saffron,
     marginTop: 4,
+    fontWeight: '500',
   },
   tagline: {
-    fontSize: 16,
-    color: '#9CA3AF',
+    fontSize: 14,
+    color: colors.ashGray,
     marginTop: 8,
   },
   inputSection: {
     marginBottom: 32,
   },
   inputLabel: {
-    color: '#D1D5DB',
+    color: colors.charcoal,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     marginBottom: 8,
     marginTop: 16,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.white,
     borderRadius: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: colors.sandstone,
   },
   inputIcon: {
     marginRight: 12,
   },
   textInput: {
     flex: 1,
-    color: '#FFFFFF',
+    color: colors.charcoal,
     fontSize: 16,
     paddingVertical: 14,
   },
@@ -277,26 +279,31 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   errorText: {
-    color: '#EF4444',
+    color: colors.false,
     fontSize: 14,
   },
   checkButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#10B981',
+    backgroundColor: colors.deepIndigo,
     borderRadius: 12,
     paddingVertical: 16,
     marginTop: 24,
     gap: 8,
   },
   checkButtonDisabled: {
-    backgroundColor: '#374151',
+    backgroundColor: colors.sandstone,
   },
   checkButtonText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 18,
     fontWeight: '600',
+  },
+  checkButtonHindi: {
+    color: colors.warmOrange,
+    fontSize: 16,
+    fontWeight: '500',
   },
   infoContainer: {
     flexDirection: 'row',
@@ -306,14 +313,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   infoText: {
-    color: '#6B7280',
+    color: colors.lightGray,
     fontSize: 14,
   },
   platformsContainer: {
     alignItems: 'center',
   },
   platformsLabel: {
-    color: '#6B7280',
+    color: colors.lightGray,
     fontSize: 12,
     marginBottom: 12,
     textTransform: 'uppercase',
@@ -326,14 +333,16 @@ const styles = StyleSheet.create({
   platformBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.white,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
     gap: 8,
+    borderWidth: 1,
+    borderColor: colors.sandstone,
   },
   platformText: {
-    color: '#D1D5DB',
+    color: colors.charcoal,
     fontSize: 14,
   },
 });

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CheckResult } from '../store/useCheckStore';
+import { colors } from '../constants/theme';
 
 interface VerdictCardProps {
   result: CheckResult;
@@ -11,40 +12,45 @@ const getVerdictConfig = (verdict: string) => {
   switch (verdict) {
     case 'TRUE':
       return {
-        color: '#10B981',
-        bgColor: '#064E3B',
+        color: colors.verified,
+        bgColor: colors.verifiedBg,
+        borderColor: colors.verified,
         icon: 'checkmark-circle' as const,
-        label: 'TRUE',
-        labelHindi: 'सच',
+        label: 'VERIFIED',
+        labelHindi: 'सत्यापित',
       };
     case 'FALSE':
       return {
-        color: '#EF4444',
-        bgColor: '#7F1D1D',
+        color: colors.false,
+        bgColor: colors.falseBg,
+        borderColor: colors.false,
         icon: 'close-circle' as const,
         label: 'FALSE',
         labelHindi: 'झूठ',
       };
     case 'MISLEADING':
       return {
-        color: '#F59E0B',
-        bgColor: '#78350F',
+        color: colors.turmeric,
+        bgColor: colors.turmericBg,
+        borderColor: colors.turmeric,
         icon: 'warning' as const,
         label: 'MISLEADING',
         labelHindi: 'भ्रामक',
       };
     case 'PARTIALLY_TRUE':
       return {
-        color: '#3B82F6',
-        bgColor: '#1E3A8A',
+        color: colors.deepTeal,
+        bgColor: '#eaf3f3',
+        borderColor: colors.deepTeal,
         icon: 'remove-circle' as const,
         label: 'PARTIALLY TRUE',
         labelHindi: 'आंशिक सच',
       };
     default:
       return {
-        color: '#6B7280',
-        bgColor: '#374151',
+        color: colors.ashGray,
+        bgColor: colors.warmWhite,
+        borderColor: colors.ashGray,
         icon: 'help-circle' as const,
         label: 'UNKNOWN',
         labelHindi: 'अज्ञात',
@@ -72,14 +78,14 @@ const getCategoryIcon = (category: string) => {
 };
 
 // Bilingual Section Component
-const BilingualSection = ({ 
-  label, 
-  englishText, 
-  regionalText, 
+const BilingualSection = ({
+  label,
+  englishText,
+  regionalText,
   icon,
   iconColor,
   boxStyle,
-  textStyle
+  textStyle,
 }: {
   label: string;
   englishText: string;
@@ -90,23 +96,23 @@ const BilingualSection = ({
   textStyle?: object;
 }) => {
   if (!englishText && !regionalText) return null;
-  
+
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        {icon && <Ionicons name={icon as any} size={16} color={iconColor || '#6B7280'} />}
+        {icon && <Ionicons name={icon as any} size={16} color={iconColor || colors.ashGray} />}
         <Text style={[styles.sectionLabel, icon ? { marginLeft: 6, marginBottom: 0 } : {}]}>{label}</Text>
       </View>
       <View style={[styles.bilingualBox, boxStyle]}>
         {englishText && (
           <View style={styles.languageBlock}>
-            <Text style={styles.languageLabel}>🇬🇧 English</Text>
+            <Text style={styles.languageLabel}>English</Text>
             <Text style={[styles.contentText, textStyle]}>{englishText}</Text>
           </View>
         )}
         {regionalText && (
           <View style={[styles.languageBlock, englishText ? styles.languageBlockBorder : {}]}>
-            <Text style={styles.languageLabel}>🇮🇳 आपकी भाषा</Text>
+            <Text style={styles.languageLabel}>आपकी भाषा</Text>
             <Text style={[styles.contentText, textStyle]}>{regionalText}</Text>
           </View>
         )}
@@ -118,20 +124,20 @@ const BilingualSection = ({
 // Bilingual Key Points Component
 const BilingualKeyPoints = ({
   englishPoints,
-  regionalPoints
+  regionalPoints,
 }: {
   englishPoints: string[];
   regionalPoints?: string[];
 }) => {
   if (!englishPoints || englishPoints.length === 0) return null;
-  
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionLabel}>KEY POINTS FROM VIDEO</Text>
       <View style={styles.keyPointsContainer}>
         {/* English Points */}
         <View style={styles.languageBlock}>
-          <Text style={styles.languageLabel}>🇬🇧 English</Text>
+          <Text style={styles.languageLabel}>English</Text>
           {englishPoints.map((point, index) => (
             <View key={`en-${index}`} style={styles.keyPointItem}>
               <View style={styles.bulletPoint} />
@@ -142,7 +148,7 @@ const BilingualKeyPoints = ({
         {/* Regional Points */}
         {regionalPoints && regionalPoints.length > 0 && (
           <View style={[styles.languageBlock, styles.languageBlockBorder]}>
-            <Text style={styles.languageLabel}>🇮🇳 आपकी भाषा</Text>
+            <Text style={styles.languageLabel}>आपकी भाषा</Text>
             {regionalPoints.map((point, index) => (
               <View key={`reg-${index}`} style={styles.keyPointItem}>
                 <View style={styles.bulletPoint} />
@@ -162,14 +168,17 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({ result }) => {
   return (
     <View style={styles.container}>
       {/* Verdict Badge */}
-      <View style={[styles.verdictBadge, { backgroundColor: config.bgColor }]}>
+      <View style={[styles.verdictBadge, { backgroundColor: config.bgColor, borderColor: config.borderColor }]}>
         <Ionicons name={config.icon} size={48} color={config.color} />
         <Text style={[styles.verdictText, { color: config.color }]}>
           {config.label}
         </Text>
+        <Text style={[styles.verdictHindi, { color: config.color }]}>
+          {config.labelHindi}
+        </Text>
         {result.category && (
           <View style={styles.categoryBadge}>
-            <Ionicons name={getCategoryIcon(result.category) as any} size={14} color="#9CA3AF" />
+            <Ionicons name={getCategoryIcon(result.category) as any} size={14} color={colors.ashGray} />
             <Text style={styles.categoryText}>{result.category.toUpperCase()}</Text>
           </View>
         )}
@@ -220,7 +229,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({ result }) => {
         englishText={result.fact_details}
         regionalText={result.fact_details_regional}
         icon="book"
-        iconColor="#10B981"
+        iconColor={colors.verified}
         boxStyle={styles.factDetailsBox}
         textStyle={styles.factDetailsText}
       />
@@ -231,7 +240,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({ result }) => {
         englishText={result.what_to_know}
         regionalText={result.what_to_know_regional}
         icon="bulb"
-        iconColor="#F59E0B"
+        iconColor={colors.turmeric}
         boxStyle={styles.adviceBox}
         textStyle={styles.adviceText}
       />
@@ -239,7 +248,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({ result }) => {
       {/* Sources Note */}
       {result.sources_note && (
         <View style={styles.sourcesContainer}>
-          <Ionicons name="library" size={14} color="#6B7280" />
+          <Ionicons name="library" size={14} color={colors.ashGray} />
           <Text style={styles.sourcesText}>{result.sources_note}</Text>
         </View>
       )}
@@ -251,7 +260,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({ result }) => {
           englishText={result.why_misleading}
           regionalText={result.why_misleading_regional}
           icon="alert-circle"
-          iconColor="#EF4444"
+          iconColor={colors.false}
           boxStyle={styles.misleadingBox}
           textStyle={styles.misleadingText}
         />
@@ -261,7 +270,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({ result }) => {
       {result.verdict_text_english && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="language" size={16} color="#3B82F6" />
+            <Ionicons name="language" size={16} color={colors.deepTeal} />
             <Text style={[styles.sectionLabel, { marginLeft: 6, marginBottom: 0 }]}>DETAILED ANALYSIS (ENGLISH)</Text>
           </View>
           <View style={[styles.verdictTextBox, { borderColor: config.color }]}>
@@ -274,7 +283,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({ result }) => {
       {result.verdict_text_regional && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="volume-high" size={16} color="#10B981" />
+            <Ionicons name="volume-high" size={16} color={colors.saffron} />
             <Text style={[styles.sectionLabel, { marginLeft: 6, marginBottom: 0 }]}>DETAILED ANALYSIS (आपकी भाषा)</Text>
           </View>
           <View style={[styles.verdictTextBox, { borderColor: config.color }]}>
@@ -296,25 +305,31 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 16,
     marginBottom: 24,
+    borderWidth: 2,
   },
   verdictText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     marginTop: 8,
     letterSpacing: 2,
+  },
+  verdictHindi: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 2,
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.06)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
   },
   categoryText: {
-    color: '#9CA3AF',
+    color: colors.ashGray,
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 1,
@@ -328,34 +343,36 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionLabel: {
-    color: '#6B7280',
+    color: colors.ashGray,
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 1,
     marginBottom: 8,
   },
   bilingualBox: {
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.white,
     borderRadius: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.sandstone,
   },
   languageBlock: {
     padding: 12,
   },
   languageBlockBorder: {
     borderTopWidth: 1,
-    borderTopColor: '#374151',
+    borderTopColor: colors.divider,
   },
   languageLabel: {
-    color: '#9CA3AF',
+    color: colors.saffron,
     fontSize: 11,
     fontWeight: '600',
     marginBottom: 6,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   contentText: {
-    color: '#FFFFFF',
+    color: colors.charcoal,
     fontSize: 15,
     lineHeight: 22,
   },
@@ -364,7 +381,7 @@ const styles = StyleSheet.create({
   },
   confidenceBar: {
     height: 8,
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.sandstone,
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 8,
@@ -378,9 +395,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   keyPointsContainer: {
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.white,
     borderRadius: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.sandstone,
   },
   keyPointItem: {
     flexDirection: 'row',
@@ -391,63 +410,70 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#6B7280',
+    backgroundColor: colors.saffron,
     marginTop: 7,
     marginRight: 10,
   },
   keyPointText: {
-    color: '#D1D5DB',
+    color: colors.charcoal,
     fontSize: 14,
     lineHeight: 20,
     flex: 1,
   },
   factDetailsBox: {
-    backgroundColor: '#064E3B',
+    backgroundColor: colors.verifiedBg,
     borderLeftWidth: 4,
-    borderLeftColor: '#10B981',
+    borderLeftColor: colors.verified,
+    borderColor: colors.verified,
   },
   factDetailsText: {
-    color: '#D1FAE5',
+    color: '#1a5c38',
   },
   adviceBox: {
-    backgroundColor: '#78350F',
+    backgroundColor: colors.turmericBg,
     borderLeftWidth: 4,
-    borderLeftColor: '#F59E0B',
+    borderLeftColor: colors.turmeric,
+    borderColor: colors.turmeric,
   },
   adviceText: {
-    color: '#FEF3C7',
+    color: '#7a5a10',
   },
   misleadingBox: {
-    backgroundColor: '#7F1D1D',
+    backgroundColor: colors.falseBg,
     borderLeftWidth: 4,
-    borderLeftColor: '#EF4444',
+    borderLeftColor: colors.false,
+    borderColor: colors.false,
   },
   misleadingText: {
-    color: '#FEE2E2',
+    color: '#8b3520',
   },
   sourcesContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.white,
     borderRadius: 8,
     padding: 12,
     marginBottom: 20,
     gap: 8,
+    borderWidth: 1,
+    borderColor: colors.sandstone,
   },
   sourcesText: {
-    color: '#9CA3AF',
+    color: colors.ashGray,
     fontSize: 13,
     fontStyle: 'italic',
     flex: 1,
   },
   verdictTextBox: {
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.white,
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
+    borderWidth: 1,
+    borderColor: colors.sandstone,
   },
   verdictSpeechText: {
-    color: '#FFFFFF',
+    color: colors.charcoal,
     fontSize: 15,
     lineHeight: 24,
   },

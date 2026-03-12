@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
+import { colors } from '../constants/theme';
 
 // Component to handle share intent navigation
 function ShareIntentHandler({ children }: { children: React.ReactNode }) {
@@ -17,7 +18,7 @@ function ShareIntentHandler({ children }: { children: React.ReactNode }) {
     // navigate back to home to handle the new share
     if (hasShareIntent && !processingRef.current) {
       const currentScreen = segments[0] || 'index';
-      
+
       if (currentScreen === 'result') {
         processingRef.current = true;
         // Navigate to home — do NOT call reset() here because index.tsx is already
@@ -40,11 +41,11 @@ export default function RootLayout() {
     <ShareIntentProvider>
       <ShareIntentHandler>
         <View style={styles.container}>
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
           <Stack
             screenOptions={{
               headerShown: false,
-              contentStyle: { backgroundColor: '#0F172A' },
+              contentStyle: { backgroundColor: colors.cream },
               animation: 'slide_from_right',
             }}
           >
@@ -60,6 +61,6 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.cream,
   },
 });

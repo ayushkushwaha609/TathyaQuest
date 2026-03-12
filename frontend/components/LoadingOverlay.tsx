@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { colors } from '../constants/theme';
 
 const LOADING_MESSAGES = [
   { text: 'सच ढूंढ रहे हैं...', english: 'Searching for truth...' },
@@ -14,13 +14,16 @@ export const LoadingOverlay: React.FC = () => {
   const [messageIndex, setMessageIndex] = useState(0);
   const spinValue = new Animated.Value(0);
   const pulseValue = new Animated.Value(1);
+  const ring1 = new Animated.Value(0.3);
+  const ring2 = new Animated.Value(0.2);
+  const ring3 = new Animated.Value(0.1);
 
   useEffect(() => {
     // Rotate animation
     Animated.loop(
       Animated.timing(spinValue, {
         toValue: 1,
-        duration: 2000,
+        duration: 3000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
@@ -30,19 +33,44 @@ export const LoadingOverlay: React.FC = () => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseValue, {
-          toValue: 1.1,
-          duration: 1000,
+          toValue: 1.15,
+          duration: 1200,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(pulseValue, {
           toValue: 1,
-          duration: 1000,
+          duration: 1200,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
       ])
     ).start();
+
+    // Mandala ring animations — sequential pulsing
+    const animateRing = (ring: Animated.Value, delay: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(ring, {
+            toValue: 0.6,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring, {
+            toValue: 0.15,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    animateRing(ring1, 0);
+    animateRing(ring2, 300);
+    animateRing(ring3, 600);
 
     // Cycle through messages
     const interval = setInterval(() => {
@@ -59,16 +87,23 @@ export const LoadingOverlay: React.FC = () => {
 
   return (
     <View style={styles.overlay}>
-      <Animated.View
-        style={[
-          styles.iconContainer,
-          {
-            transform: [{ rotate: spin }, { scale: pulseValue }],
-          },
-        ]}
-      >
-        <Ionicons name="search" size={64} color="#10B981" />
-      </Animated.View>
+      {/* Mandala-style concentric rings */}
+      <View style={styles.mandalaContainer}>
+        <Animated.View style={[styles.ring, styles.ring3, { opacity: ring3 }]} />
+        <Animated.View style={[styles.ring, styles.ring2, { opacity: ring2 }]} />
+        <Animated.View style={[styles.ring, styles.ring1, { opacity: ring1 }]} />
+
+        <Animated.View
+          style={[
+            styles.iconContainer,
+            {
+              transform: [{ rotate: spin }, { scale: pulseValue }],
+            },
+          ]}
+        >
+          <View style={styles.centerDot} />
+        </Animated.View>
+      </View>
 
       <Text style={styles.hindiText}>
         {LOADING_MESSAGES[messageIndex].text}
@@ -77,8 +112,29 @@ export const LoadingOverlay: React.FC = () => {
         {LOADING_MESSAGES[messageIndex].english}
       </Text>
 
+      {/* Step indicators */}
+      <View style={styles.stepsContainer}>
+        {['Extracting', 'Analyzing', 'Verifying'].map((step, i) => (
+          <View
+            key={step}
+            style={[
+              styles.stepBadge,
+              messageIndex >= i * 2 && styles.stepBadgeActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.stepText,
+                messageIndex >= i * 2 && styles.stepTextActive,
+              ]}
+            >
+              {step}
+            </Text>
+          </View>
+        ))}
+      </View>
+
       <View style={styles.timeContainer}>
-        <Ionicons name="time-outline" size={16} color="#6B7280" />
         <Text style={styles.timeText}>This usually takes 15-30 seconds</Text>
       </View>
     </View>
@@ -92,26 +148,83 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+    backgroundColor: colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
   },
-  iconContainer: {
+  mandalaContainer: {
+    width: 160,
+    height: 160,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 32,
   },
+  ring: {
+    position: 'absolute',
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: colors.saffron,
+  },
+  ring1: {
+    width: 80,
+    height: 80,
+  },
+  ring2: {
+    width: 120,
+    height: 120,
+  },
+  ring3: {
+    width: 152,
+    height: 152,
+    borderStyle: 'dashed',
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.saffron,
+  },
   hindiText: {
-    color: '#FFFFFF',
-    fontSize: 24,
+    color: colors.white,
+    fontSize: 22,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
   },
   englishText: {
-    color: '#9CA3AF',
-    fontSize: 16,
-    marginBottom: 40,
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
+    marginBottom: 32,
     textAlign: 'center',
+  },
+  stepsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 24,
+  },
+  stepBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  stepBadgeActive: {
+    backgroundColor: 'rgba(232,124,62,0.2)',
+  },
+  stepText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.25)',
+    fontWeight: '500',
+  },
+  stepTextActive: {
+    color: colors.saffron,
   },
   timeContainer: {
     flexDirection: 'row',
@@ -119,7 +232,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   timeText: {
-    color: '#6B7280',
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 13,
   },
 });

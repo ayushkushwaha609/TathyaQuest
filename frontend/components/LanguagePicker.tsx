@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LANGUAGES, Language } from '../constants/languages';
+import { colors } from '../constants/theme';
 
 interface LanguagePickerProps {
   selectedValue: string;
@@ -39,7 +40,7 @@ export const LanguagePicker: React.FC<LanguagePickerProps> = ({
       <Text style={styles.optionNative}>{item.nativeLabel}</Text>
       <Text style={styles.optionLabel}>{item.label}</Text>
       {item.value === selectedValue && (
-        <Ionicons name="checkmark" size={20} color="#10B981" />
+        <Ionicons name="checkmark" size={20} color={colors.saffron} />
       )}
     </TouchableOpacity>
   );
@@ -51,12 +52,12 @@ export const LanguagePicker: React.FC<LanguagePickerProps> = ({
         onPress={() => setModalVisible(true)}
       >
         <View style={styles.selectorContent}>
-          <Ionicons name="language" size={20} color="#9CA3AF" />
+          <Ionicons name="language" size={20} color={colors.ashGray} />
           <Text style={styles.selectorText}>
             {selectedLanguage?.nativeLabel} ({selectedLanguage?.label})
           </Text>
         </View>
-        <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
+        <Ionicons name="chevron-down" size={20} color={colors.ashGray} />
       </TouchableOpacity>
 
       <Modal
@@ -74,7 +75,7 @@ export const LanguagePicker: React.FC<LanguagePickerProps> = ({
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Language</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#FFFFFF" />
+                <Ionicons name="close" size={24} color={colors.charcoal} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -95,12 +96,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.white,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: colors.sandstone,
   },
   selectorContent: {
     flexDirection: 'row',
@@ -108,16 +109,16 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   selectorText: {
-    color: '#FFFFFF',
+    color: colors.charcoal,
     fontSize: 16,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#111827',
+    backgroundColor: colors.cream,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingBottom: 40,
@@ -129,10 +130,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#1F2937',
+    borderBottomColor: colors.sandstone,
   },
   modalTitle: {
-    color: '#FFFFFF',
+    color: colors.deepIndigo,
     fontSize: 18,
     fontWeight: '600',
   },
@@ -142,19 +143,19 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#1F2937',
+    borderBottomColor: colors.divider,
   },
   selectedOption: {
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.warmWhite,
   },
   optionNative: {
-    color: '#FFFFFF',
+    color: colors.charcoal,
     fontSize: 18,
     fontWeight: '500',
     flex: 1,
   },
   optionLabel: {
-    color: '#9CA3AF',
+    color: colors.ashGray,
     fontSize: 14,
     marginRight: 12,
   },

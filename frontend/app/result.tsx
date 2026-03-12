@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useCheckStore } from '../store/useCheckStore';
 import { VerdictCard } from '../components/VerdictCard';
+import { colors } from '../constants/theme';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -19,17 +20,8 @@ export default function ResultScreen() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioLoaded, setAudioLoaded] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
-  // Tracks whether audio has auto-played for this mount of the result screen.
-  // Prevents double-play when the result store updates a second time (e.g. due
-  // to a duplicate in-flight API call returning after the first one).
   const hasAutoPlayedRef = useRef(false);
 
-  // Redirect effect — runs only on mount.
-  // This is a safety guard for direct/unexpected navigation to /result when
-  // there is nothing to show. _layout.tsx owns navigation away from this
-  // screen when a new share intent arrives, so we must NOT react to store
-  // changes here — doing so causes a second router.replace('/') that remounts
-  // index.tsx and invalidates the already-started runCheck request.
   useEffect(() => {
     const { result: currentResult, isLoading: currentLoading } = useCheckStore.getState();
     if (!currentResult && !currentLoading) {
@@ -38,10 +30,8 @@ export default function ResultScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Audio setup effect — only auto-plays once per screen mount
   useEffect(() => {
     if (!result?.audio_base64) return;
-    // Skip if we already auto-played for this screen session
     if (hasAutoPlayedRef.current) return;
 
     const setupAudio = async () => {
@@ -54,22 +44,17 @@ export default function ResultScreen() {
         });
 
         const sound = new Audio.Sound();
-        // Sarvam TTS returns WAV format audio
         await sound.loadAsync({
           uri: `data:audio/wav;base64,${result.audio_base64}`,
         });
         soundRef.current = sound;
         setAudioLoaded(true);
 
-        // Mark as played before starting so a concurrent result update
-        // can't trigger a second auto-play
         hasAutoPlayedRef.current = true;
 
-        // Auto-play on load
         await sound.playAsync();
         setIsPlaying(true);
 
-        // Listen for playback status
         sound.setOnPlaybackStatusUpdate((status) => {
           if (status.isLoaded && status.didJustFinish) {
             setIsPlaying(false);
@@ -82,7 +67,6 @@ export default function ResultScreen() {
 
     setupAudio();
 
-    // Cleanup
     return () => {
       if (soundRef.current) {
         soundRef.current.unloadAsync();
@@ -101,7 +85,6 @@ export default function ResultScreen() {
       } else {
         const status = await soundRef.current.getStatusAsync();
         if (status.isLoaded && status.positionMillis === status.durationMillis) {
-          // Replay from start
           await soundRef.current.setPositionAsync(0);
         }
         await soundRef.current.playAsync();
@@ -129,7 +112,7 @@ export default function ResultScreen() {
           style={styles.backButton}
           onPress={handleCheckAnother}
         >
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={24} color={colors.deepIndigo} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Result</Text>
         <View style={styles.headerPlaceholder} />
@@ -146,6 +129,8 @@ export default function ResultScreen() {
         {/* Audio Player */}
         {result.audio_base64 && (
           <View style={styles.audioSection}>
+            <Text style={styles.audioTitle}>Audio Summary</Text>
+            <Text style={styles.audioSubtitle}>ऑडियो सारांश</Text>
             <TouchableOpacity
               style={[
                 styles.playButton,
@@ -157,7 +142,7 @@ export default function ResultScreen() {
               <Ionicons
                 name={isPlaying ? 'pause' : 'play'}
                 size={32}
-                color="#FFFFFF"
+                color={colors.white}
               />
             </TouchableOpacity>
             <Text style={styles.audioLabel}>
@@ -173,7 +158,7 @@ export default function ResultScreen() {
           style={styles.checkAnotherButton}
           onPress={handleCheckAnother}
         >
-          <Ionicons name="refresh" size={20} color="#10B981" />
+          <Ionicons name="refresh" size={20} color={colors.white} />
           <Text style={styles.checkAnotherText}>Check Another Video</Text>
         </TouchableOpacity>
       </View>
@@ -184,7 +169,7 @@ export default function ResultScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.cream,
   },
   header: {
     flexDirection: 'row',
@@ -193,7 +178,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1F2937',
+    borderBottomColor: colors.sandstone,
   },
   backButton: {
     width: 40,
@@ -202,7 +187,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    color: '#FFFFFF',
+    color: colors.deepIndigo,
     fontSize: 18,
     fontWeight: '600',
   },
@@ -217,47 +202,63 @@ const styles = StyleSheet.create({
   },
   audioSection: {
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
+    marginHorizontal: 20,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.sandstone,
+  },
+  audioTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.saffron,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  audioSubtitle: {
+    fontSize: 14,
+    color: colors.ashGray,
+    marginBottom: 16,
   },
   playButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#10B981',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.deepIndigo,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    shadowColor: '#10B981',
+    shadowColor: colors.deepIndigo,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 8,
   },
   playButtonDisabled: {
-    backgroundColor: '#374151',
+    backgroundColor: colors.sandstone,
   },
   audioLabel: {
-    color: '#9CA3AF',
+    color: colors.ashGray,
     fontSize: 14,
   },
   bottomAction: {
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: '#1F2937',
+    borderTopColor: colors.sandstone,
   },
   checkAnotherButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1F2937',
+    backgroundColor: colors.deepIndigo,
     borderRadius: 12,
     paddingVertical: 16,
     gap: 8,
-    borderWidth: 1,
-    borderColor: '#10B981',
   },
   checkAnotherText: {
-    color: '#10B981',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
