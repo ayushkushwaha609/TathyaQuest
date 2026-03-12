@@ -235,7 +235,7 @@ export default function HomeScreen() {
         {/* Donation Button */}
         <TouchableOpacity
           style={[styles.donateButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-          onPress={() => Linking.openURL('https://chai4.me/ayushkushwaha609')}
+          onPress={() => Linking.openURL('https://buymeachai.ezee.li/ayushkushwaha')}
           activeOpacity={0.8}
         >
           <Ionicons name="heart" size={16} color="#e74c8b" />
