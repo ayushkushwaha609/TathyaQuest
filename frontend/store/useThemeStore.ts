@@ -8,8 +8,8 @@ interface ThemeStore {
 }
 
 export const useThemeStore = create<ThemeStore>((set) => ({
-  isDark: false,
-  colors: lightColors,
+  isDark: true,
+  colors: darkColors,
   toggleTheme: () =>
     set((state) => ({
       isDark: !state.isDark,

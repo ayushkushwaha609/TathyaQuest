@@ -1,23 +1,23 @@
-// TathyaCheck Design System — Indigo to Saffron spectrum
+// TathyaCheck Design System — Warm Cream + Deep Indigo punch
 
 export const lightColors = {
-  // Primary spectrum
-  deepIndigo: '#1a1147',
-  navyBlue: '#0f1d3d',
-  deepTeal: '#1a4a4a',
+  // Punch & accent
+  deepIndigo: '#2d1b69',
+  navyBlue: '#3b2a80',
+  deepTeal: '#4a3a94',
   saffron: '#e87c3e',
   warmOrange: '#f4a261',
 
-  // Gradient
-  gradientStart: '#faf5ef',
-  gradientEnd: '#ede1d1',
+  // Gradient (warm cream → soft peach)
+  gradientStart: '#fffaf5',
+  gradientEnd: '#fde4d0',
 
   // Surfaces
-  background: '#faf5ef',
+  background: '#fffaf5',
   card: '#ffffff',
-  cardBorder: '#e8ddd0',
+  cardBorder: '#f0e0d0',
   inputBg: '#ffffff',
-  divider: '#ede6da',
+  divider: '#f0e6dc',
   sandstone: '#e8ddd0',
 
   // Verdict states
@@ -27,42 +27,42 @@ export const lightColors = {
   falseBg: '#fdf0ec',
   turmeric: '#d4a03c',
   turmericBg: '#fdf8ec',
-  partialBg: '#eaf3f3',
+  partialBg: '#f5f0ff',
   lotusRose: '#d4717a',
 
   // Text
-  textPrimary: '#2a2a2a',
-  textSecondary: '#6b6b6b',
-  textTertiary: '#9a9a9a',
+  textPrimary: '#2a2233',
+  textSecondary: '#6b6078',
+  textTertiary: '#9a90a8',
   textOnDark: '#ffffff',
 
   // Overlays
-  overlay: 'rgba(26, 17, 71, 0.92)',
-  modalOverlay: 'rgba(0, 0, 0, 0.4)',
+  overlay: 'rgba(45, 27, 105, 0.92)',
+  modalOverlay: 'rgba(0, 0, 0, 0.35)',
 
   // Status bar
   statusBar: 'dark' as const,
 };
 
 export const darkColors = {
-  // Primary spectrum
+  // Punch & accent (lightened for dark bg)
   deepIndigo: '#c4b5fd',
   navyBlue: '#a5b4fc',
-  deepTeal: '#5eead4',
-  saffron: '#e87c3e',
+  deepTeal: '#b8a9f0',
+  saffron: '#f4a261',
   warmOrange: '#f4a261',
 
   // Gradient
-  gradientStart: '#0f0a2e',
-  gradientEnd: '#1a1147',
+  gradientStart: '#140e28',
+  gradientEnd: '#1e1540',
 
   // Surfaces
-  background: '#0f0a2e',
-  card: '#1e1754',
-  cardBorder: '#2d2570',
-  inputBg: '#1e1754',
-  divider: '#2d2570',
-  sandstone: '#2d2570',
+  background: '#140e28',
+  card: '#1e1750',
+  cardBorder: '#2d2568',
+  inputBg: '#1e1750',
+  divider: '#2d2568',
+  sandstone: '#2d2568',
 
   // Verdict states
   verified: '#4ade80',
@@ -71,7 +71,7 @@ export const darkColors = {
   falseBg: '#2a0f0f',
   turmeric: '#fbbf24',
   turmericBg: '#2a2005',
-  partialBg: '#0f2a2a',
+  partialBg: '#1a1540',
   lotusRose: '#fb7185',
 
   // Text
@@ -81,15 +81,13 @@ export const darkColors = {
   textOnDark: '#ffffff',
 
   // Overlays
-  overlay: 'rgba(15, 10, 46, 0.95)',
+  overlay: 'rgba(20, 14, 40, 0.95)',
   modalOverlay: 'rgba(0, 0, 0, 0.7)',
 
   // Status bar
   statusBar: 'light' as const,
 };
 
-export type ThemeColors = typeof lightColors;
+export type ThemeColors = Omit<typeof lightColors, 'statusBar'> & { statusBar: 'dark' | 'light' };
 
-// Convenience alias — components import `colors` for backward compat
-// but useThemeStore provides the live theme
 export const colors = lightColors;

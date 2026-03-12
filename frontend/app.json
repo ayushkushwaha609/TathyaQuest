@@ -14,7 +14,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#0F172A"
+        "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.tathya.app"
@@ -32,7 +32,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0F172A"
+          "backgroundColor": "#ffffff"
         }
       ],
       [
@@ -50,8 +50,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "3b4374dd-f7fd-4c4a-aad4-a1b08cf548ff"
+        "projectId": "7fd45bc7-f8c7-4926-84f9-7215ec3fd31a"
       }
-    }
+    },
+    "owner": "kushayush"
   }
 }

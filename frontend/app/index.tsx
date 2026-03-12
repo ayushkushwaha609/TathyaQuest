@@ -87,6 +87,11 @@ export default function HomeScreen() {
       colors={[colors.gradientStart, colors.gradientEnd]}
       style={styles.gradient}
     >
+      {/* Decorative blobs */}
+      <View style={[styles.blob1, { backgroundColor: isDark ? 'rgba(196,181,253,0.08)' : 'rgba(45,27,105,0.06)' }]} />
+      <View style={[styles.blob2, { backgroundColor: isDark ? 'rgba(244,162,97,0.06)' : 'rgba(232,124,62,0.08)' }]} />
+      <View style={[styles.blob3, { backgroundColor: isDark ? 'rgba(196,181,253,0.05)' : 'rgba(45,27,105,0.04)' }]} />
+
       <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -112,11 +117,15 @@ export default function HomeScreen() {
 
             {/* Header with Logo */}
             <View style={styles.header}>
-              <Image
-                source={require('../assets/images/logo.png')}
-                style={[styles.logo, isDark && { tintColor: '#ffffff' }]}
-                resizeMode="contain"
-              />
+              <View style={styles.logoWrapper}>
+                <Image
+                  source={isDark
+                    ? require('../assets/images/logodark.png')
+                    : require('../assets/images/logo.png')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              </View>
               <Text style={[styles.taglineHindi, { color: colors.saffron }]}>
                 तथ्य की जांच
               </Text>
@@ -169,26 +178,28 @@ export default function HomeScreen() {
                 onValueChange={setLanguageCode}
               />
 
-              {/* Check Button with gradient */}
+              {/* Check Button */}
               <TouchableOpacity
                 onPress={handleCheck}
                 disabled={!url || isLoading}
                 activeOpacity={0.8}
               >
-                <LinearGradient
-                  colors={(!url || isLoading)
-                    ? [colors.sandstone, colors.sandstone]
-                    : [colors.deepIndigo as string, colors.deepTeal as string]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.checkButton}
+                <View
+                  style={[
+                    styles.checkButton,
+                    {
+                      backgroundColor: (!url || isLoading)
+                        ? colors.sandstone
+                        : colors.deepIndigo as string,
+                    },
+                  ]}
                 >
                   <Text style={styles.checkButtonText}>Check</Text>
                   <Text style={[styles.checkButtonHindi, { color: colors.warmOrange }]}>
                     जांचें
                   </Text>
                   <Ionicons name="arrow-forward" size={20} color="#fff" />
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
 
               <View style={styles.infoContainer}>
@@ -228,6 +239,30 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
+  blob1: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    top: -40,
+    right: -60,
+  },
+  blob2: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    top: 160,
+    left: -50,
+  },
+  blob3: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    bottom: 120,
+    right: -30,
+  },
   container: {
     flex: 1,
   },
@@ -256,10 +291,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 36,
   },
-  logo: {
-    width: 200,
-    height: 80,
+  logoWrapper: {
+    borderRadius: 16,
+    overflow: 'hidden',
     marginBottom: 8,
+  },
+  logoWrapperDark: {
+    backgroundColor: '#ffffff',
+    padding: 8,
+    borderRadius: 16,
+  },
+  logo: {
+    width: 312,
+    height: 125,
   },
   taglineHindi: {
     fontSize: 16,
@@ -281,7 +325,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 16,
     borderWidth: 1,
   },
@@ -306,7 +350,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 16,
     marginTop: 24,
     gap: 8,

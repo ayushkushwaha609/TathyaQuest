@@ -17,7 +17,7 @@ import { VerdictCard } from '../components/VerdictCard';
 
 export default function ResultScreen() {
   const router = useRouter();
-  const { colors } = useThemeStore();
+  const { colors, isDark } = useThemeStore();
   const { result, reset } = useCheckStore();
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioLoaded, setAudioLoaded] = useState(false);
@@ -108,6 +108,10 @@ export default function ResultScreen() {
       colors={[colors.gradientStart, colors.gradientEnd]}
       style={styles.gradient}
     >
+      {/* Decorative blobs */}
+      <View style={[styles.blob1, { backgroundColor: isDark ? 'rgba(196,181,253,0.08)' : 'rgba(45,27,105,0.06)' }]} />
+      <View style={[styles.blob2, { backgroundColor: isDark ? 'rgba(244,162,97,0.06)' : 'rgba(232,124,62,0.08)' }]} />
+
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
@@ -142,20 +146,22 @@ export default function ResultScreen() {
                 disabled={!audioLoaded}
                 activeOpacity={0.8}
               >
-                <LinearGradient
-                  colors={!audioLoaded
-                    ? [colors.sandstone, colors.sandstone]
-                    : [colors.deepIndigo as string, colors.deepTeal as string]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.playButton}
+                <View
+                  style={[
+                    styles.playButton,
+                    {
+                      backgroundColor: !audioLoaded
+                        ? colors.sandstone
+                        : colors.deepIndigo as string,
+                    },
+                  ]}
                 >
                   <Ionicons
                     name={isPlaying ? 'pause' : 'play'}
                     size={32}
                     color="#ffffff"
                   />
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
               <Text style={[styles.audioLabel, { color: colors.textSecondary }]}>
                 {isPlaying ? 'Playing verdict...' : 'Tap to play verdict'}
@@ -167,15 +173,10 @@ export default function ResultScreen() {
         {/* Bottom Action */}
         <View style={[styles.bottomAction, { borderTopColor: colors.cardBorder }]}>
           <TouchableOpacity onPress={handleCheckAnother} activeOpacity={0.8}>
-            <LinearGradient
-              colors={[colors.deepIndigo as string, colors.deepTeal as string]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.checkAnotherButton}
-            >
+            <View style={[styles.checkAnotherButton, { backgroundColor: colors.deepIndigo as string }]}>
               <Ionicons name="refresh" size={20} color="#ffffff" />
               <Text style={styles.checkAnotherText}>Check Another Video</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -186,6 +187,22 @@ export default function ResultScreen() {
 const styles = StyleSheet.create({
   gradient: {
     flex: 1,
+  },
+  blob1: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    top: -30,
+    right: -50,
+  },
+  blob2: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    bottom: 100,
+    left: -40,
   },
   container: {
     flex: 1,
@@ -254,7 +271,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 16,
     gap: 8,
   },
