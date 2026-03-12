@@ -277,48 +277,6 @@ def extract_youtube_video_id(url: str) -> Optional[str]:
             return match.group(1)
     return None
 
-async def fetch_youtube_transcript(video_id: str, language_code: str) -> str | None:
-    """Fetch YouTube transcript using youtube-transcript-api.
-    Returns transcript text or None if unavailable."""
-    try:
-        from youtube_transcript_api import YouTubeTranscriptApi
-
-        # Map app language codes to YouTube language codes
-        yt_lang_map = {
-            'hi-IN': 'hi', 'en-IN': 'en', 'ta-IN': 'ta', 'te-IN': 'te',
-            'kn-IN': 'kn', 'ml-IN': 'ml', 'bn-IN': 'bn', 'gu-IN': 'gu',
-            'mr-IN': 'mr', 'pa-IN': 'pa', 'od-IN': 'or',
-        }
-        yt_lang = yt_lang_map.get(language_code, language_code.split('-')[0])
-
-        def _sync_fetch():
-            ytt = YouTubeTranscriptApi()
-            # Try fetching in preferred language, then English, then any available
-            try:
-                transcript = ytt.fetch(video_id, languages=[yt_lang, 'en', 'hi'])
-                return transcript
-            except Exception:
-                # Try listing all and pick the first available
-                transcript_list = ytt.list(video_id)
-                for t in transcript_list:
-                    try:
-                        return t.fetch()
-                    except Exception:
-                        continue
-            return None
-
-        result = await asyncio.to_thread(_sync_fetch)
-        if result and len(result) > 0:
-            # Combine all snippet texts
-            full_text = ' '.join(snippet.text for snippet in result)
-            if len(full_text.strip()) >= 10:
-                logger.info(f"YouTube transcript fetched: {len(full_text)} chars, lang={yt_lang}")
-                return full_text.strip()
-        return None
-    except Exception as e:
-        logger.warning(f"YouTube transcript API failed: {e}")
-        return None
-
 async def _try_youtube_mp310(client, youtube_url: str, api_key: str, output_dir: str) -> str | None:
     """Try youtube-mp310 API. Returns audio path on success, None on failure."""
     try:
@@ -824,24 +782,11 @@ async def check_claim(request: Request, body: CheckRequest):
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
             # Step 1: Extract audio based on platform
-            transcript = None
-            step1_dur = 0
-            step2_dur = 0
-
+            step1_start = time.time()
             if is_instagram:
-                step1_start = time.time()
                 logger.info("Processing Instagram Reel...")
                 normalized_url = extract_instagram_reel_url(url)
                 audio_path = await extract_audio_instagram(normalized_url, temp_dir)
-                step1_dur = time.time() - step1_start
-                logger.info(f"⏱ Step 1 - Audio extraction (RapidAPI): {step1_dur:.2f}s")
-
-                step2_start = time.time()
-                logger.info("Transcribing audio...")
-                transcript = await transcribe_audio(audio_path)
-                step2_dur = time.time() - step2_start
-                logger.info(f"⏱ Step 2 - Transcription (Groq Whisper): {step2_dur:.2f}s")
-
             elif is_youtube:
                 video_id = extract_youtube_video_id(url)
                 if not video_id:
@@ -850,38 +795,28 @@ async def check_claim(request: Request, body: CheckRequest):
                         detail={"error": "invalid_youtube_url", "message": "Could not extract video ID from the YouTube URL."}
                     )
                 logger.info(f"Processing YouTube video ID: {video_id}")
-
-                # Try transcript API first (free, fast, no audio download needed)
-                step1_start = time.time()
-                transcript = await fetch_youtube_transcript(video_id, language_code)
-                step1_dur = time.time() - step1_start
-
-                if transcript:
-                    logger.info(f"⏱ Step 1+2 - YouTube transcript API: {step1_dur:.2f}s (skipped audio+whisper)")
-                else:
-                    # Fallback to RapidAPI audio extraction + Whisper
-                    logger.info("No transcript available, falling back to RapidAPI audio extraction...")
-                    audio_path = await extract_audio_rapidapi(video_id, temp_dir)
-                    step1_dur = time.time() - step1_start
-                    logger.info(f"⏱ Step 1 - Audio extraction (RapidAPI fallback): {step1_dur:.2f}s")
-
-                    step2_start = time.time()
-                    logger.info("Transcribing audio...")
-                    transcript = await transcribe_audio(audio_path)
-                    step2_dur = time.time() - step2_start
-                    logger.info(f"⏱ Step 2 - Transcription (Groq Whisper): {step2_dur:.2f}s")
+                audio_path = await extract_audio_rapidapi(video_id, temp_dir)
             else:
                 raise HTTPException(
                     status_code=422,
                     detail={"error": "unsupported_platform", "message": "Only Instagram and YouTube are supported."}
                 )
-
+            step1_dur = time.time() - step1_start
+            logger.info(f"⏱ Step 1 - Audio extraction (RapidAPI): {step1_dur:.2f}s")
+            
+            # Step 2: Transcribe
+            step2_start = time.time()
+            logger.info("Transcribing audio...")
+            transcript = await transcribe_audio(audio_path)
+            step2_dur = time.time() - step2_start
+            logger.info(f"⏱ Step 2 - Transcription (Groq Whisper): {step2_dur:.2f}s")
+            
             if not transcript or len(transcript.strip()) < 10:
                 raise HTTPException(
                     status_code=422,
                     detail={"error": "no_speech", "message": "Could not detect speech in this video."}
                 )
-
+            
             logger.info(f"Transcript: {transcript[:200]}...")
             
             # Step 3: Fact-check

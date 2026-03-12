@@ -10,4 +10,3 @@ uvicorn==0.25.0
 starlette==0.37.2
 gunicorn==23.0.0
 duckduckgo-search==7.5.1
-youtube-transcript-api==1.2.4
