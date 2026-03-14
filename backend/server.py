@@ -25,6 +25,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
+from google import genai
+from google.genai import types as genai_types
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -55,6 +57,10 @@ if not RAPIDAPI_KEY and RAPIDAPI_KEYS:
 # Initialize Groq client
 groq_client = Groq(api_key=GROQ_API_KEY)
 
+# Initialize Gemini client
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
 # API key authentication
 APP_API_KEY = os.environ.get('APP_API_KEY', '')
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -69,9 +75,11 @@ async def verify_api_key(api_key: str = Security(api_key_header)):
 GOOGLE_CLIENT_ID_WEB = os.environ.get('GOOGLE_CLIENT_ID_WEB', '')
 GOOGLE_CLIENT_ID_ANDROID = os.environ.get('GOOGLE_CLIENT_ID_ANDROID', '')
 
-# Daily usage limits
-DAILY_LIMIT_ANON = int(os.environ.get('DAILY_LIMIT_ANON', '3'))
-DAILY_LIMIT_AUTH = int(os.environ.get('DAILY_LIMIT_AUTH', '5'))
+# Daily usage limits (per platform)
+DAILY_LIMIT_YT_ANON = int(os.environ.get('DAILY_LIMIT_YT_ANON', '10'))
+DAILY_LIMIT_YT_AUTH = int(os.environ.get('DAILY_LIMIT_YT_AUTH', '15'))
+DAILY_LIMIT_IG_ANON = int(os.environ.get('DAILY_LIMIT_IG_ANON', '3'))
+DAILY_LIMIT_IG_AUTH = int(os.environ.get('DAILY_LIMIT_IG_AUTH', '5'))
 
 # Exempt devices and emails (unlimited checks)
 _exempt_devices_env = os.environ.get('EXEMPT_DEVICE_IDS', '')
@@ -583,47 +591,40 @@ Return ONLY this JSON with no other text:
     response = await asyncio.to_thread(_sync_fact_check)
     
     response_text = response.choices[0].message.content.strip()
-    
-    # Parse JSON from response
+    return _parse_fact_check_json(response_text, lang_key, language_name)
+
+def _parse_fact_check_json(response_text: str, lang_key: str, language_name: str) -> dict:
+    """Shared JSON parsing/repair logic for fact-check responses (Groq or Gemini)."""
     try:
         # Try to extract JSON if wrapped in markdown code blocks
         if "```json" in response_text:
             response_text = response_text.split("```json")[1].split("```")[0].strip()
         elif "```" in response_text:
             response_text = response_text.split("```")[1].split("```")[0].strip()
-        
+
         # Try to repair truncated JSON
         if not response_text.rstrip().endswith("}"):
             logger.warning("JSON appears truncated, attempting repair...")
-            # Count open braces and brackets
             open_braces = response_text.count('{') - response_text.count('}')
             open_brackets = response_text.count('[') - response_text.count(']')
-            
-            # Check if we're in the middle of a string
-            # Count unescaped quotes
+
             in_string = False
             for i, char in enumerate(response_text):
                 if char == '"' and (i == 0 or response_text[i-1] != '\\'):
                     in_string = not in_string
-            
+
             if in_string:
-                # We're in the middle of a string, close it
                 response_text += '"'
-            
-            # Close any open brackets
+
             response_text += ']' * open_brackets
-            # Close any open braces
             response_text += '}' * open_braces
-            
             logger.info("Repaired truncated JSON response")
-        
+
         result = json.loads(response_text)
-        
-        # Get the verdict texts
+
         is_english_only = (lang_key == "english")
 
         if is_english_only:
-            # English-only: use verdict_spoken (no duplicate keys)
             verdict_text_english = result.get("verdict_spoken", result.get("reason", ""))
             verdict_text_regional = verdict_text_english
             combined_verdict_text = verdict_text_english
@@ -632,16 +633,14 @@ Return ONLY this JSON with no other text:
             verdict_text_english = result.get("verdict_english", result.get("reason", ""))
             verdict_text_regional = result.get(verdict_key, result.get("reason", ""))
             combined_verdict_text = f"{verdict_text_english}\n\n{verdict_text_regional}"
-        
-        # Ensure confidence is not a round number (add some variation if it is)
+
+        # Ensure confidence is not a round number
         confidence = int(result.get("confidence", 50))
         if confidence % 10 == 0 and confidence > 0 and confidence < 100:
             import random
-            # Add small random variation to make it more realistic
             confidence = confidence + random.choice([-3, -2, -1, 1, 2, 3])
-            confidence = max(1, min(99, confidence))  # Keep within bounds
-        
-        # For English-only, reuse English fields as regional; otherwise look up regional keys
+            confidence = max(1, min(99, confidence))
+
         if is_english_only:
             return {
                 "claim": result.get("claim", "Could not identify claim"),
@@ -665,38 +664,30 @@ Return ONLY this JSON with no other text:
                 "why_misleading_regional": result.get("why_misleading", "")
             }
         else:
-            claim_regional_key = f"claim_{lang_key}"
-            reason_regional_key = f"reason_{lang_key}"
-            key_points_regional_key = f"key_points_{lang_key}"
-            fact_details_regional_key = f"fact_details_{lang_key}"
-            what_to_know_regional_key = f"what_to_know_{lang_key}"
-            why_misleading_regional_key = f"why_misleading_{lang_key}"
-
             return {
                 "claim": result.get("claim", "Could not identify claim"),
-                "claim_regional": result.get(claim_regional_key, ""),
+                "claim_regional": result.get(f"claim_{lang_key}", ""),
                 "verdict": result.get("verdict", "MISLEADING"),
                 "confidence": confidence,
                 "reason": result.get("reason", "Analysis inconclusive"),
-                "reason_regional": result.get(reason_regional_key, ""),
+                "reason_regional": result.get(f"reason_{lang_key}", ""),
                 "verdict_text": combined_verdict_text,
                 "verdict_text_english": verdict_text_english,
                 "verdict_text_regional": verdict_text_regional,
                 "category": result.get("category", "general"),
                 "key_points": result.get("key_points", []),
-                "key_points_regional": result.get(key_points_regional_key, []),
+                "key_points_regional": result.get(f"key_points_{lang_key}", []),
                 "fact_details": result.get("fact_details", ""),
-                "fact_details_regional": result.get(fact_details_regional_key, ""),
+                "fact_details_regional": result.get(f"fact_details_{lang_key}", ""),
                 "what_to_know": result.get("what_to_know", ""),
-                "what_to_know_regional": result.get(what_to_know_regional_key, ""),
+                "what_to_know_regional": result.get(f"what_to_know_{lang_key}", ""),
                 "sources_note": result.get("sources_note", ""),
                 "why_misleading": result.get("why_misleading", ""),
-                "why_misleading_regional": result.get(why_misleading_regional_key, "")
+                "why_misleading_regional": result.get(f"why_misleading_{lang_key}", "")
             }
     except json.JSONDecodeError as e:
         logger.error(f"JSON parse error: {e}, Response: {response_text[:500]}...")
-        
-        # Get the appropriate error message in regional language
+
         error_messages = {
             "english": "Analysis failed",
             "hindi": "विश्लेषण विफल",
@@ -709,7 +700,7 @@ Return ONLY this JSON with no other text:
             "gujarati": "વિશ્લેષણ નિષ્ફળ",
         }
         regional_error = error_messages.get(lang_key, "विश्लेषण विफल")
-        
+
         return {
             "claim": "Could not parse response",
             "claim_regional": regional_error,
@@ -731,6 +722,116 @@ Return ONLY this JSON with no other text:
             "why_misleading": "",
             "why_misleading_regional": ""
         }
+
+
+async def fact_check_youtube_gemini(url: str, language_code: str) -> dict:
+    """Fact-check a YouTube video using Gemini 2.0 Flash (transcribe + fact-check in one shot)."""
+    lang_key, language_name = LANGUAGE_MAP.get(language_code, ("hindi", "Hindi"))
+
+    # Web search for grounding — use the YouTube URL as a search query
+    # Extract a brief query from the URL or use it directly
+    search_query = url
+    web_context = await web_search(search_query)
+
+    web_context_block = ""
+    if web_context:
+        web_context_block = f"""\n\nWEB SEARCH RESULTS (use these to verify claims against current real-world information):
+\"\"\"
+{web_context}
+\"\"\"\n"""
+
+    system_prompt = """You are an expert fact-checker with broad knowledge across topics including science, history, current affairs, technology, health, finance, and general knowledge.
+
+IMPORTANT RULES:
+1. First, carefully watch and transcribe the spoken content of the video.
+2. You ONLY fact-check claims that are EXPLICITLY stated in the video. Do NOT infer or assume claims.
+3. Be OBJECTIVE - stick to verifiable facts, not opinions or interpretations.
+4. Your confidence score should reflect how certain you are about the factual accuracy, using precise numbers (e.g., 73, 87, 91) - NOT round numbers like 50, 60, 70.
+5. If something is MISLEADING, you MUST explain exactly WHY it is misleading and what the correct information is.
+6. Provide thorough, educational explanations that help users understand the truth.
+7. USE the web search results provided to verify claims against up-to-date real-world information. Prefer web search evidence over your training data for current events and recent facts.
+8. If web search results contradict a claim, cite the source in your sources_note.
+
+Always return ONLY valid JSON. No explanation outside the JSON object."""
+
+    is_english_only = (lang_key == "english")
+
+    if is_english_only:
+        json_template = """{
+  "claim": "One clear sentence summarizing the main claim",
+  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE",
+  "confidence": integer 0-100 (use specific numbers like 73, 84, 91),
+  "category": "health" or "science" or "history" or "technology" or "finance" or "news" or "general",
+  "key_points": ["Point 1", "Point 2"],
+  "reason": "1-2 sentences explaining verdict",
+  "why_misleading": "If MISLEADING/PARTIALLY_TRUE: 1-2 sentences why. Otherwise empty string.",
+  "fact_details": "2-3 sentences about the actual facts",
+  "what_to_know": "1-2 sentences of practical advice",
+  "sources_note": "Brief source note",
+  "verdict_spoken": "2-3 sentence spoken explanation suitable for text-to-speech"
+}"""
+        language_instruction = "Provide ALL content in English. Keep responses CONCISE to fit within limits."
+    else:
+        json_template = f"""{{
+  "claim": "One clear sentence summarizing the main claim (English)",
+  "claim_{lang_key}": "Same claim in {language_name}",
+  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE",
+  "confidence": integer 0-100 (use specific numbers like 73, 84, 91),
+  "category": "health" or "science" or "history" or "technology" or "finance" or "news" or "general",
+  "key_points": ["Point 1 English", "Point 2 English"],
+  "key_points_{lang_key}": ["Point 1 {language_name}", "Point 2 {language_name}"],
+  "reason": "1-2 sentences explaining verdict in English",
+  "reason_{lang_key}": "Same in {language_name}",
+  "why_misleading": "If MISLEADING/PARTIALLY_TRUE: 1-2 sentences why. Otherwise empty string.",
+  "why_misleading_{lang_key}": "Same in {language_name} or empty string",
+  "fact_details": "2-3 sentences about the actual facts (English)",
+  "fact_details_{lang_key}": "Same in {language_name}",
+  "what_to_know": "1-2 sentences of practical advice (English)",
+  "what_to_know_{lang_key}": "Same in {language_name}",
+  "sources_note": "Brief source note (English only)",
+  "verdict_english": "2-3 sentence spoken explanation in English",
+  "verdict_{lang_key}": "Same 2-3 sentence explanation in {language_name}"
+}}"""
+        language_instruction = f"Provide ALL content in BOTH English AND {language_name}. Keep responses CONCISE to fit within limits."
+
+    user_prompt = f"""Watch this YouTube video carefully and transcribe its spoken content, then fact-check the claims made in it.
+{web_context_block}
+TASK: Fact-check ONLY the specific claims made in this video. Use the web search results (if available) to verify claims against current real-world information. Do not evaluate opinions, predictions, or subjective statements - only verifiable factual claims.
+
+IMPORTANT: {language_instruction}
+
+Return ONLY this JSON with no other text:
+{json_template}
+"""
+
+    try:
+        logger.info(f"Fact-checking YouTube video via Gemini Flash: {url}")
+
+        def _sync_gemini_call():
+            return gemini_client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=[
+                    genai_types.Content(parts=[
+                        genai_types.Part.from_uri(file_uri=url, mime_type="video/*"),
+                        genai_types.Part(text=f"{system_prompt}\n\n{user_prompt}"),
+                    ])
+                ],
+                config=genai_types.GenerateContentConfig(
+                    temperature=0.2,
+                    max_output_tokens=4000,
+                ),
+            )
+
+        response = await asyncio.to_thread(_sync_gemini_call)
+        response_text = response.text.strip()
+        logger.info(f"Gemini response length: {len(response_text)} chars")
+
+        return _parse_fact_check_json(response_text, lang_key, language_name)
+
+    except Exception as e:
+        logger.error(f"Gemini fact-check failed: {e}")
+        raise  # Let the caller handle fallback
+
 
 async def synthesize_speech(text: str, language_code: str) -> Optional[str]:
     """Convert text to speech using Sarvam AI TTS"""
@@ -795,29 +896,49 @@ async def is_device_exempt(device_id: str) -> bool:
     return False
 
 async def get_device_usage(device_id: str) -> dict:
-    """Return daily_limit, checks_used, checks_remaining, is_authenticated for a device."""
+    """Return per-platform usage: youtube and instagram limits/counts."""
     device = await devices_collection.find_one({"device_id": device_id})
     is_auth = bool(device and (device.get("google_id") or device.get("admin_email")))
-    checks_used = await usage_collection.count_documents({"device_id": device_id, "date_ist": today_ist()})
-
     exempt = await is_device_exempt(device_id)
+
+    today = today_ist()
+    yt_used = await usage_collection.count_documents({"device_id": device_id, "date_ist": today, "platform": "youtube"})
+    ig_used = await usage_collection.count_documents({"device_id": device_id, "date_ist": today, "platform": "instagram"})
+    # Legacy docs (no platform field) count against Instagram
+    legacy_used = await usage_collection.count_documents({"device_id": device_id, "date_ist": today, "platform": {"$exists": False}})
+
     if exempt:
-        daily_limit = 999999
+        yt_limit = ig_limit = 999999
     else:
-        daily_limit = DAILY_LIMIT_AUTH if is_auth else DAILY_LIMIT_ANON
+        yt_limit = DAILY_LIMIT_YT_AUTH if is_auth else DAILY_LIMIT_YT_ANON
+        ig_limit = DAILY_LIMIT_IG_AUTH if is_auth else DAILY_LIMIT_IG_ANON
+
+    ig_total_used = ig_used + legacy_used
 
     return {
-        "daily_limit": daily_limit,
-        "checks_used": checks_used,
-        "checks_remaining": max(0, daily_limit - checks_used),
+        "youtube": {
+            "daily_limit": yt_limit,
+            "checks_used": yt_used,
+            "checks_remaining": max(0, yt_limit - yt_used),
+        },
+        "instagram": {
+            "daily_limit": ig_limit,
+            "checks_used": ig_total_used,
+            "checks_remaining": max(0, ig_limit - ig_total_used),
+        },
+        # Backward compat flat fields (sum of both platforms)
+        "daily_limit": yt_limit + ig_limit,
+        "checks_used": yt_used + ig_total_used,
+        "checks_remaining": max(0, yt_limit - yt_used) + max(0, ig_limit - ig_total_used),
         "is_authenticated": is_auth,
         "is_exempt": exempt,
         "email": (device.get("google_email") or device.get("admin_email") if device else None),
         "name": (device.get("google_name") or device.get("admin_name") if device else None),
     }
 
-# --- Dependency: verify daily limit ---
-async def verify_daily_limit(request: Request):
+# --- Verify daily limit for a specific platform ---
+async def verify_daily_limit(request: Request, platform: str):
+    """Check if device has remaining checks for the given platform ('youtube' or 'instagram')."""
     device_id = request.headers.get("X-Device-Id")
     if not device_id:
         raise HTTPException(status_code=400, detail={"error": "missing_device_id", "message": "Device ID is required."})
@@ -830,13 +951,17 @@ async def verify_daily_limit(request: Request):
     )
 
     usage = await get_device_usage(device_id)
-    if usage["checks_remaining"] <= 0:
-        msg = "Daily limit reached. Sign in with Google for more checks!" if not usage["is_authenticated"] else "Daily limit reached. Come back tomorrow!"
+    platform_usage = usage.get(platform, usage.get("instagram"))
+
+    if platform_usage["checks_remaining"] <= 0:
+        platform_label = "YouTube" if platform == "youtube" else "Instagram"
+        msg = f"{platform_label} daily limit reached. Sign in with Google for more checks!" if not usage["is_authenticated"] else f"{platform_label} daily limit reached. Come back tomorrow!"
         raise HTTPException(status_code=429, detail={
             "error": "daily_limit_reached",
             "message": msg,
-            "daily_limit": usage["daily_limit"],
-            "checks_used": usage["checks_used"],
+            "daily_limit": platform_usage["daily_limit"],
+            "checks_used": platform_usage["checks_used"],
+            "platform": platform,
         })
 
 # --- Auth endpoints ---
@@ -983,132 +1108,166 @@ async def check_claim(request: Request, body: CheckRequest):
         logger.info(f"MongoDB cache hit for {cache_key}")
         return CheckResponse(**{k: v for k, v in cached.items() if k != "cache_key" and k != "created_at"})
 
-    # Only enforce daily limit for non-cached (fresh) checks
-    await verify_daily_limit(request)
-
-    pipeline_start = time.time()
-    logger.info(f"Processing URL: {url} with language: {language_code}")
-    
-    # Determine platform and extract accordingly
+    # Determine platform
     is_instagram = is_instagram_url(url)
     is_youtube = is_youtube_url(url)
-    
-    # Create temp directory for audio
-    with tempfile.TemporaryDirectory() as temp_dir:
-        try:
-            # Step 1: Extract audio based on platform
-            step1_start = time.time()
-            if is_instagram:
-                logger.info("Processing Instagram Reel...")
-                normalized_url = extract_instagram_reel_url(url)
-                audio_path = await extract_audio_instagram(normalized_url, temp_dir)
-            elif is_youtube:
+    platform = "youtube" if is_youtube else "instagram"
+
+    # Only enforce daily limit for non-cached (fresh) checks
+    await verify_daily_limit(request, platform)
+
+    pipeline_start = time.time()
+    logger.info(f"Processing URL: {url} with language: {language_code} (platform: {platform})")
+
+    try:
+        if is_youtube:
+            # --- YouTube pipeline: Gemini Flash (transcribe + fact-check in one shot) ---
+            result = None
+
+            # Primary: Gemini Flash
+            if gemini_client:
+                try:
+                    step_gemini_start = time.time()
+                    result = await fact_check_youtube_gemini(url, language_code)
+                    step_gemini_dur = time.time() - step_gemini_start
+                    logger.info(f"⏱ Steps 1-3 (Gemini Flash): {step_gemini_dur:.2f}s")
+                except Exception as e:
+                    logger.warning(f"Gemini pipeline failed, falling back to RapidAPI+Groq: {e}")
+
+            # Fallback: RapidAPI → Groq Whisper → Groq Llama
+            if result is None:
                 video_id = extract_youtube_video_id(url)
                 if not video_id:
                     raise HTTPException(
                         status_code=422,
                         detail={"error": "invalid_youtube_url", "message": "Could not extract video ID from the YouTube URL."}
                     )
-                logger.info(f"Processing YouTube video ID: {video_id}")
-                audio_path = await extract_audio_rapidapi(video_id, temp_dir)
-            else:
-                raise HTTPException(
-                    status_code=422,
-                    detail={"error": "unsupported_platform", "message": "Only Instagram and YouTube are supported."}
-                )
-            step1_dur = time.time() - step1_start
-            logger.info(f"⏱ Step 1 - Audio extraction (RapidAPI): {step1_dur:.2f}s")
-            
-            # Step 2: Transcribe
-            step2_start = time.time()
-            logger.info("Transcribing audio...")
-            transcript = await transcribe_audio(audio_path)
-            step2_dur = time.time() - step2_start
-            logger.info(f"⏱ Step 2 - Transcription (Groq Whisper): {step2_dur:.2f}s")
-            
-            if not transcript or len(transcript.strip()) < 10:
-                raise HTTPException(
-                    status_code=422,
-                    detail={"error": "no_speech", "message": "Could not detect speech in this video."}
-                )
-            
-            logger.info(f"Transcript: {transcript[:200]}...")
-            
-            # Step 3: Fact-check
-            step3_start = time.time()
-            logger.info("Fact-checking...")
-            result = await fact_check_transcript(transcript, language_code)
-            step3_dur = time.time() - step3_start
-            logger.info(f"⏱ Step 3 - Fact-check (Groq Llama): {step3_dur:.2f}s")
-            
-            # Step 4: Generate TTS with the more elaborate regional language text
-            step4_start = time.time()
-            # Use the regional language verdict for TTS (more elaborate version)
-            audio_text = result.get("verdict_text_regional", result["verdict_text"])
-            logger.info(f"Generating speech for {language_code}, text ({len(audio_text)} chars): {audio_text[:100]}...")
-            audio_base64 = await synthesize_speech(audio_text, language_code)
-            step4_dur = time.time() - step4_start
-            logger.info(f"⏱ Step 4 - TTS (Sarvam AI): {step4_dur:.2f}s")
-            
-            total_dur = time.time() - pipeline_start
-            logger.info(f"⏱ TOTAL pipeline: {total_dur:.2f}s | Breakdown: audio={step1_dur:.2f}s, transcribe={step2_dur:.2f}s, fact-check={step3_dur:.2f}s, tts={step4_dur:.2f}s")
-            
-            # Build response
-            response = CheckResponse(
-                claim=result["claim"],
-                claim_regional=result.get("claim_regional", ""),
-                verdict=result["verdict"],
-                confidence=result["confidence"],
-                reason=result["reason"],
-                reason_regional=result.get("reason_regional", ""),
-                verdict_text=result["verdict_text"],
-                verdict_text_english=result.get("verdict_text_english", ""),
-                verdict_text_regional=result.get("verdict_text_regional", ""),
-                audio_base64=audio_base64,
-                category=result.get("category", "general"),
-                key_points=result.get("key_points", []),
-                key_points_regional=result.get("key_points_regional", []),
-                fact_details=result.get("fact_details", ""),
-                fact_details_regional=result.get("fact_details_regional", ""),
-                what_to_know=result.get("what_to_know", ""),
-                what_to_know_regional=result.get("what_to_know_regional", ""),
-                sources_note=result.get("sources_note", ""),
-                why_misleading=result.get("why_misleading", ""),
-                why_misleading_regional=result.get("why_misleading_regional", ""),
-            )
-            
-            # Store in MongoDB cache (upsert to handle concurrent requests for same URL)
-            cache_doc = response.model_dump()
-            cache_doc["cache_key"] = cache_key
-            cache_doc["url"] = url
-            cache_doc["language_code"] = language_code
-            cache_doc["created_at"] = datetime.now(timezone.utc).isoformat()
-            await checks_collection.update_one(
-                {"cache_key": cache_key},
-                {"$set": cache_doc},
-                upsert=True
-            )
+                logger.info(f"Fallback: Processing YouTube video ID via RapidAPI: {video_id}")
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    step1_start = time.time()
+                    audio_path = await extract_audio_rapidapi(video_id, temp_dir)
+                    step1_dur = time.time() - step1_start
+                    logger.info(f"⏱ Step 1 - Audio extraction (RapidAPI fallback): {step1_dur:.2f}s")
 
-            # Log usage for daily limit tracking
-            if device_id:
-                await usage_collection.insert_one({
-                    "device_id": device_id,
-                    "date_ist": today_ist(),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "url_checked": url,
-                    "language_code": language_code,
-                })
+                    step2_start = time.time()
+                    transcript = await transcribe_audio(audio_path)
+                    step2_dur = time.time() - step2_start
+                    logger.info(f"⏱ Step 2 - Transcription (Groq Whisper): {step2_dur:.2f}s")
 
-            return response
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Processing error: {e}")
+                    if not transcript or len(transcript.strip()) < 10:
+                        raise HTTPException(
+                            status_code=422,
+                            detail={"error": "no_speech", "message": "Could not detect speech in this video."}
+                        )
+
+                    step3_start = time.time()
+                    result = await fact_check_transcript(transcript, language_code)
+                    step3_dur = time.time() - step3_start
+                    logger.info(f"⏱ Step 3 - Fact-check (Groq Llama fallback): {step3_dur:.2f}s")
+
+        elif is_instagram:
+            # --- Instagram pipeline: RapidAPI → Groq Whisper → Groq Llama (unchanged) ---
+            with tempfile.TemporaryDirectory() as temp_dir:
+                step1_start = time.time()
+                logger.info("Processing Instagram Reel...")
+                normalized_url = extract_instagram_reel_url(url)
+                audio_path = await extract_audio_instagram(normalized_url, temp_dir)
+                step1_dur = time.time() - step1_start
+                logger.info(f"⏱ Step 1 - Audio extraction (RapidAPI): {step1_dur:.2f}s")
+
+                step2_start = time.time()
+                logger.info("Transcribing audio...")
+                transcript = await transcribe_audio(audio_path)
+                step2_dur = time.time() - step2_start
+                logger.info(f"⏱ Step 2 - Transcription (Groq Whisper): {step2_dur:.2f}s")
+
+                if not transcript or len(transcript.strip()) < 10:
+                    raise HTTPException(
+                        status_code=422,
+                        detail={"error": "no_speech", "message": "Could not detect speech in this video."}
+                    )
+
+                logger.info(f"Transcript: {transcript[:200]}...")
+
+                step3_start = time.time()
+                logger.info("Fact-checking...")
+                result = await fact_check_transcript(transcript, language_code)
+                step3_dur = time.time() - step3_start
+                logger.info(f"⏱ Step 3 - Fact-check (Groq Llama): {step3_dur:.2f}s")
+        else:
             raise HTTPException(
-                status_code=500,
-                detail={"error": "processing_error", "message": "An internal error occurred. Please try again later."}
+                status_code=422,
+                detail={"error": "unsupported_platform", "message": "Only Instagram and YouTube are supported."}
             )
+
+        # --- Shared: TTS + cache + usage logging ---
+        step4_start = time.time()
+        audio_text = result.get("verdict_text_regional", result["verdict_text"])
+        logger.info(f"Generating speech for {language_code}, text ({len(audio_text)} chars): {audio_text[:100]}...")
+        audio_base64 = await synthesize_speech(audio_text, language_code)
+        step4_dur = time.time() - step4_start
+        logger.info(f"⏱ Step 4 - TTS (Sarvam AI): {step4_dur:.2f}s")
+
+        total_dur = time.time() - pipeline_start
+        logger.info(f"⏱ TOTAL pipeline ({platform}): {total_dur:.2f}s")
+
+        # Build response
+        response = CheckResponse(
+            claim=result["claim"],
+            claim_regional=result.get("claim_regional", ""),
+            verdict=result["verdict"],
+            confidence=result["confidence"],
+            reason=result["reason"],
+            reason_regional=result.get("reason_regional", ""),
+            verdict_text=result["verdict_text"],
+            verdict_text_english=result.get("verdict_text_english", ""),
+            verdict_text_regional=result.get("verdict_text_regional", ""),
+            audio_base64=audio_base64,
+            category=result.get("category", "general"),
+            key_points=result.get("key_points", []),
+            key_points_regional=result.get("key_points_regional", []),
+            fact_details=result.get("fact_details", ""),
+            fact_details_regional=result.get("fact_details_regional", ""),
+            what_to_know=result.get("what_to_know", ""),
+            what_to_know_regional=result.get("what_to_know_regional", ""),
+            sources_note=result.get("sources_note", ""),
+            why_misleading=result.get("why_misleading", ""),
+            why_misleading_regional=result.get("why_misleading_regional", ""),
+        )
+
+        # Store in MongoDB cache
+        cache_doc = response.model_dump()
+        cache_doc["cache_key"] = cache_key
+        cache_doc["url"] = url
+        cache_doc["language_code"] = language_code
+        cache_doc["created_at"] = datetime.now(timezone.utc).isoformat()
+        await checks_collection.update_one(
+            {"cache_key": cache_key},
+            {"$set": cache_doc},
+            upsert=True
+        )
+
+        # Log usage with platform tag
+        if device_id:
+            await usage_collection.insert_one({
+                "device_id": device_id,
+                "date_ist": today_ist(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "url_checked": url,
+                "language_code": language_code,
+                "platform": platform,
+            })
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Processing error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "processing_error", "message": "An internal error occurred. Please try again later."}
+        )
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -1126,7 +1285,7 @@ async def startup_db():
     await checks_collection.create_index("cache_key", unique=True)
     await devices_collection.create_index("device_id", unique=True)
     await devices_collection.create_index("google_id", sparse=True)
-    await usage_collection.create_index([("device_id", 1), ("date_ist", 1)])
+    await usage_collection.create_index([("device_id", 1), ("date_ist", 1), ("platform", 1)])
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

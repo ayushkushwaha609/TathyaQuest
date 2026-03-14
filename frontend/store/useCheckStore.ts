@@ -77,13 +77,17 @@ export const useCheckStore = create<CheckStore>((set, get) => ({
       return false;
     }
 
-    // Pre-check daily limit (exempt users skip this)
+    // Pre-check daily limit per platform (exempt users skip this)
     const authState = useAuthStore.getState();
-    if (!authState.isExempt && authState.checksRemaining <= 0) {
+    const isYouTube = /(youtube\.com|youtu\.be)/i.test(url);
+    const checksRemaining = isYouTube ? authState.ytChecksRemaining : authState.igChecksRemaining;
+    const platformLabel = isYouTube ? 'YouTube' : 'Instagram';
+
+    if (!authState.isExempt && checksRemaining <= 0) {
       isRequestInFlight = false;
       const msg = authState.isAuthenticated
-        ? 'Daily limit reached. Come back tomorrow!'
-        : 'Daily limit reached. Sign in with Google for more checks!';
+        ? `${platformLabel} daily limit reached. Come back tomorrow!`
+        : `${platformLabel} daily limit reached. Sign in with Google for more checks!`;
       set({ error: msg });
       return false;
     }

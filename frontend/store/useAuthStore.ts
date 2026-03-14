@@ -14,9 +14,13 @@ interface AuthStore {
   isExempt: boolean;
   googleEmail: string | null;
   googleName: string | null;
-  dailyLimit: number;
-  checksUsed: number;
-  checksRemaining: number;
+  // Per-platform usage
+  ytDailyLimit: number;
+  ytChecksUsed: number;
+  ytChecksRemaining: number;
+  igDailyLimit: number;
+  igChecksUsed: number;
+  igChecksRemaining: number;
   isAuthLoading: boolean;
 
   initDevice: () => Promise<void>;
@@ -24,7 +28,29 @@ interface AuthStore {
   signInWithGoogle: (idToken: string) => Promise<boolean>;
   signInWithAdmin: (email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
-  incrementUsage: () => void;
+}
+
+function parseUsageFromResponse(data: any) {
+  // Support new nested format and backward-compat flat format
+  if (data.youtube && data.instagram) {
+    return {
+      ytDailyLimit: data.youtube.daily_limit,
+      ytChecksUsed: data.youtube.checks_used,
+      ytChecksRemaining: data.youtube.checks_remaining,
+      igDailyLimit: data.instagram.daily_limit,
+      igChecksUsed: data.instagram.checks_used,
+      igChecksRemaining: data.instagram.checks_remaining,
+    };
+  }
+  // Fallback for old flat format
+  return {
+    ytDailyLimit: data.daily_limit ?? 10,
+    ytChecksUsed: data.checks_used ?? 0,
+    ytChecksRemaining: data.checks_remaining ?? 10,
+    igDailyLimit: data.daily_limit ?? 3,
+    igChecksUsed: data.checks_used ?? 0,
+    igChecksRemaining: data.checks_remaining ?? 3,
+  };
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -33,9 +59,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   isExempt: false,
   googleEmail: null,
   googleName: null,
-  dailyLimit: 3,
-  checksUsed: 0,
-  checksRemaining: 3,
+  ytDailyLimit: 10,
+  ytChecksUsed: 0,
+  ytChecksRemaining: 10,
+  igDailyLimit: 3,
+  igChecksUsed: 0,
+  igChecksRemaining: 3,
   isAuthLoading: false,
 
   initDevice: async () => {
@@ -71,9 +100,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       const data = response.data;
       set({
-        dailyLimit: data.daily_limit,
-        checksUsed: data.checks_used,
-        checksRemaining: data.checks_remaining,
+        ...parseUsageFromResponse(data),
         isAuthenticated: data.is_authenticated,
         isExempt: data.is_exempt || false,
         googleEmail: data.email || null,
@@ -106,17 +133,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       });
 
       const data = response.data;
-      const authState = {
+      set({
         isAuthenticated: true,
         isExempt: data.is_exempt || false,
         googleEmail: data.email,
         googleName: data.name,
-        dailyLimit: data.daily_limit,
-        checksUsed: data.checks_used,
-        checksRemaining: data.checks_remaining,
+        ...parseUsageFromResponse(data),
         isAuthLoading: false,
-      };
-      set(authState);
+      });
 
       await AsyncStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
         isAuthenticated: true,
@@ -152,9 +176,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         isExempt: data.is_exempt || false,
         googleEmail: data.email,
         googleName: data.name,
-        dailyLimit: data.daily_limit,
-        checksUsed: data.checks_used,
-        checksRemaining: data.checks_remaining,
+        ...parseUsageFromResponse(data),
         isAuthLoading: false,
       });
 
@@ -190,9 +212,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         isExempt: false,
         googleEmail: null,
         googleName: null,
-        dailyLimit: data.daily_limit,
-        checksUsed: data.checks_used,
-        checksRemaining: data.checks_remaining,
+        ...parseUsageFromResponse(data),
         isAuthLoading: false,
       });
 
@@ -205,13 +225,5 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch {
       set({ isAuthLoading: false });
     }
-  },
-
-  incrementUsage: () => {
-    const { checksUsed, dailyLimit } = get();
-    set({
-      checksUsed: checksUsed + 1,
-      checksRemaining: Math.max(0, dailyLimit - checksUsed - 1),
-    });
   },
 }));

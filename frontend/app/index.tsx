@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Keyboard,
   Image,
   Linking,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,9 +31,12 @@ function extractUrl(text: string): string {
   return match ? match[0] : text.trim();
 }
 
+const FEEDBACK_URL = 'https://forms.gle/1g3Zv273vzsxDRmy6';
+
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, isDark, toggleTheme } = useThemeStore();
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
   const {
     url,
     setUrl,
@@ -42,7 +46,11 @@ export default function HomeScreen() {
     error,
     runCheck,
   } = useCheckStore();
-  const { checksRemaining, isExempt, fetchUsage } = useAuthStore();
+  const { ytChecksRemaining, igChecksRemaining, isExempt, fetchUsage } = useAuthStore();
+
+  // Determine platform from URL to check correct limit
+  const isYouTubeUrl = /(youtube\.com|youtu\.be)/i.test(url);
+  const checksRemaining = isYouTubeUrl ? ytChecksRemaining : igChecksRemaining;
 
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
   const isProcessingShareRef = useRef(false);
@@ -226,6 +234,27 @@ export default function HomeScreen() {
               <View style={styles.authSection}>
                 <GoogleSignInButton />
               </View>
+
+              {/* Disclaimer & Feedback */}
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                  onPress={() => setShowDisclaimer(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="information-circle-outline" size={16} color={colors.textTertiary} />
+                  <Text style={[styles.actionButtonText, { color: colors.textTertiary }]}>Why limits?</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                  onPress={() => Linking.openURL(FEEDBACK_URL)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="chatbubble-outline" size={16} color={colors.textTertiary} />
+                  <Text style={[styles.actionButtonText, { color: colors.textTertiary }]}>Feedback</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Supported Platforms */}
@@ -248,6 +277,58 @@ export default function HomeScreen() {
         </KeyboardAvoidingView>
 
         {isLoading && <LoadingOverlay />}
+
+        {/* Disclaimer Modal */}
+        <Modal
+          visible={showDisclaimer}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDisclaimer(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowDisclaimer(false)}
+          >
+            <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <View style={styles.modalHeader}>
+                <Ionicons name="information-circle" size={24} color={colors.saffron} />
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>About Usage Limits</Text>
+              </View>
+              <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
+                TathyaQuest uses multiple AI and third-party APIs to verify claims, and each check incurs real infrastructure costs on our end.
+              </Text>
+              <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
+                To keep the service free and accessible while we work toward a sustainable model, we've introduced daily usage limits — 10 YouTube / 3 Instagram checks without sign-in, and 15 YouTube / 5 Instagram with a Google account.
+              </Text>
+              <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
+                We're actively working on a freemium plan that will offer higher limits. Your continued usage helps us understand demand and shape the right pricing.
+              </Text>
+              <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
+                Thank you for supporting TathyaQuest while we grow.
+              </Text>
+              <View style={styles.modalDivider} />
+              <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
+                TathyaQuest दावों की जाँच के लिए कई AI और थर्ड-पार्टी APIs का उपयोग करता है, और हर जाँच पर हमें वास्तविक इंफ्रास्ट्रक्चर लागत आती है।
+              </Text>
+              <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
+                सेवा को मुफ़्त और सबके लिए सुलभ बनाए रखने के लिए, जब तक हम एक टिकाऊ मॉडल पर काम कर रहे हैं, हमने दैनिक उपयोग सीमाएँ तय की हैं — बिना साइन-इन के 10 YouTube / 3 Instagram जाँच, और Google अकाउंट से साइन-इन करने पर 15 YouTube / 5 Instagram जाँच।
+              </Text>
+              <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
+                हम एक फ्रीमियम प्लान पर सक्रिय रूप से काम कर रहे हैं जिसमें अधिक सीमाएँ उपलब्ध होंगी। आपका निरंतर उपयोग हमें माँग को समझने और सही मूल्य निर्धारण तय करने में मदद करता है।
+              </Text>
+              <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
+                TathyaQuest को बढ़ने में सहयोग देने के लिए आपका धन्यवाद!
+              </Text>
+              <TouchableOpacity
+                style={[styles.modalClose, { backgroundColor: colors.deepIndigo as string }]}
+                onPress={() => setShowDisclaimer(false)}
+              >
+                <Text style={styles.modalCloseText}>Got it</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Donation Button */}
         <TouchableOpacity
@@ -317,10 +398,12 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 36,
   },
   logoWrapper: {
-    marginBottom: 8,
+    marginBottom: 0,
+    alignItems: 'center',
   },
   logoWrapperDark: {
     backgroundColor: '#ffffff',
@@ -335,13 +418,15 @@ const styles = StyleSheet.create({
   taglineHindi: {
     fontSize: 16,
     fontWeight: '500',
+    textAlign: 'center',
   },
   tagline: {
     fontSize: 14,
-    marginTop: 4,
+    marginTop: 2,
+    textAlign: 'center',
   },
   usageBadgeWrapper: {
-    marginTop: 12,
+    marginTop: 8,
   },
   inputSection: {
     marginBottom: 32,
@@ -451,6 +536,70 @@ const styles = StyleSheet.create({
   },
   donateText: {
     fontSize: 13,
+    fontWeight: '600',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 16,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 8,
+  },
+  modalBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  modalClose: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  modalCloseText: {
+    color: '#ffffff',
+    fontSize: 15,
     fontWeight: '600',
   },
 });

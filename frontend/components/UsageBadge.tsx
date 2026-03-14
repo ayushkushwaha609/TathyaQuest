@@ -4,34 +4,41 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 
+function getBadgeColor(remaining: number, isExempt: boolean, falseColor: string) {
+  if (!isExempt && remaining <= 0) return falseColor;
+  if (!isExempt && remaining === 1) return '#F59E0B';
+  return '#4CAF50';
+}
+
 export function UsageBadge() {
-  const { checksRemaining, dailyLimit, checksUsed, isExempt } = useAuthStore();
+  const { ytChecksRemaining, ytDailyLimit, igChecksRemaining, igDailyLimit, isExempt } = useAuthStore();
   const { colors } = useThemeStore();
 
-  const isLimitReached = !isExempt && checksRemaining <= 0;
-  const isLow = !isExempt && checksRemaining === 1;
-
-  const badgeColor = isLimitReached ? colors.false : isLow ? '#F59E0B' : '#4CAF50';
-
-  let label: string;
   if (isExempt) {
-    label = 'Unlimited checks';
-  } else if (isLimitReached) {
-    label = 'Daily limit reached';
-  } else {
-    label = `${checksRemaining}/${dailyLimit} checks left today`;
+    return (
+      <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+        <View style={styles.row}>
+          <Ionicons name="shield-checkmark" size={16} color="#4CAF50" />
+          <Text style={[styles.text, { color: colors.textPrimary }]}>Unlimited checks</Text>
+        </View>
+      </View>
+    );
   }
+
+  const ytColor = getBadgeColor(ytChecksRemaining, isExempt, colors.false as string);
+  const igColor = getBadgeColor(igChecksRemaining, isExempt, colors.false as string);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
       <View style={styles.row}>
-        <Ionicons
-          name={isLimitReached ? 'alert-circle' : 'shield-checkmark'}
-          size={16}
-          color={badgeColor}
-        />
+        <Ionicons name="logo-youtube" size={14} color={ytColor} />
         <Text style={[styles.text, { color: colors.textPrimary }]}>
-          {label}
+          {ytChecksRemaining <= 0 ? 'YT limit reached' : `YT: ${ytChecksRemaining}/${ytDailyLimit}`}
+        </Text>
+        <Text style={[styles.separator, { color: colors.textTertiary }]}>|</Text>
+        <Ionicons name="logo-instagram" size={14} color={igColor} />
+        <Text style={[styles.text, { color: colors.textPrimary }]}>
+          {igChecksRemaining <= 0 ? 'IG limit reached' : `IG: ${igChecksRemaining}/${igDailyLimit}`}
         </Text>
       </View>
     </View>
@@ -52,7 +59,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   text: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
+  },
+  separator: {
+    fontSize: 12,
+    marginHorizontal: 2,
   },
 });
