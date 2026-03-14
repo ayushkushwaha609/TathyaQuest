@@ -42,9 +42,7 @@
         }
       ],
       "expo-font",
-      "expo-web-browser",
-      "expo-auth-session",
-      "expo-crypto"
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
