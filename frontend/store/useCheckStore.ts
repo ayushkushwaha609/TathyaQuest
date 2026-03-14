@@ -77,9 +77,9 @@ export const useCheckStore = create<CheckStore>((set, get) => ({
       return false;
     }
 
-    // Pre-check daily limit
+    // Pre-check daily limit (exempt users skip this)
     const authState = useAuthStore.getState();
-    if (authState.checksRemaining <= 0) {
+    if (!authState.isExempt && authState.checksRemaining <= 0) {
       isRequestInFlight = false;
       const msg = authState.isAuthenticated
         ? 'Daily limit reached. Come back tomorrow!'

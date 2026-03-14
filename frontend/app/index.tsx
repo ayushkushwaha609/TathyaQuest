@@ -42,7 +42,7 @@ export default function HomeScreen() {
     error,
     runCheck,
   } = useCheckStore();
-  const { checksRemaining, fetchUsage } = useAuthStore();
+  const { checksRemaining, isExempt, fetchUsage } = useAuthStore();
 
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
   const isProcessingShareRef = useRef(false);
@@ -194,14 +194,14 @@ export default function HomeScreen() {
               {/* Check Button */}
               <TouchableOpacity
                 onPress={handleCheck}
-                disabled={!url || isLoading || checksRemaining <= 0}
+                disabled={!url || isLoading || (!isExempt && checksRemaining <= 0)}
                 activeOpacity={0.8}
               >
                 <View
                   style={[
                     styles.checkButton,
                     {
-                      backgroundColor: (!url || isLoading || checksRemaining <= 0)
+                      backgroundColor: (!url || isLoading || (!isExempt && checksRemaining <= 0))
                         ? colors.sandstone
                         : colors.deepIndigo as string,
                     },

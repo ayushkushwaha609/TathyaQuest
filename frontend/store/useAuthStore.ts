@@ -11,6 +11,7 @@ const AUTH_STATE_KEY = '@tathya/auth_state';
 interface AuthStore {
   deviceId: string | null;
   isAuthenticated: boolean;
+  isExempt: boolean;
   googleEmail: string | null;
   googleName: string | null;
   dailyLimit: number;
@@ -21,6 +22,7 @@ interface AuthStore {
   initDevice: () => Promise<void>;
   fetchUsage: () => Promise<void>;
   signInWithGoogle: (idToken: string) => Promise<boolean>;
+  signInWithAdmin: (email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   incrementUsage: () => void;
 }
@@ -28,6 +30,7 @@ interface AuthStore {
 export const useAuthStore = create<AuthStore>((set, get) => ({
   deviceId: null,
   isAuthenticated: false,
+  isExempt: false,
   googleEmail: null,
   googleName: null,
   dailyLimit: 3,
@@ -46,6 +49,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         const parsed = JSON.parse(saved);
         set({
           isAuthenticated: parsed.isAuthenticated || false,
+          isExempt: parsed.isExempt || false,
           googleEmail: parsed.googleEmail || null,
           googleName: parsed.googleName || null,
         });
@@ -71,6 +75,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         checksUsed: data.checks_used,
         checksRemaining: data.checks_remaining,
         isAuthenticated: data.is_authenticated,
+        isExempt: data.is_exempt || false,
         googleEmail: data.email || null,
         googleName: data.name || null,
       });
@@ -78,6 +83,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // Persist auth state
       await AsyncStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
         isAuthenticated: data.is_authenticated,
+        isExempt: data.is_exempt || false,
         googleEmail: data.email,
         googleName: data.name,
       }));
@@ -102,6 +108,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const data = response.data;
       const authState = {
         isAuthenticated: true,
+        isExempt: data.is_exempt || false,
         googleEmail: data.email,
         googleName: data.name,
         dailyLimit: data.daily_limit,
@@ -113,6 +120,47 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       await AsyncStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
         isAuthenticated: true,
+        isExempt: data.is_exempt || false,
+        googleEmail: data.email,
+        googleName: data.name,
+      }));
+
+      return true;
+    } catch {
+      set({ isAuthLoading: false });
+      return false;
+    }
+  },
+
+  signInWithAdmin: async (email: string, password: string) => {
+    const { deviceId } = get();
+    if (!deviceId) return false;
+
+    set({ isAuthLoading: true });
+    try {
+      const response = await axios.post(`${API_URL}/api/auth/admin`, {
+        email,
+        password,
+        device_id: deviceId,
+      }, {
+        headers: API_KEY ? { 'X-API-Key': API_KEY } : {},
+      });
+
+      const data = response.data;
+      set({
+        isAuthenticated: true,
+        isExempt: data.is_exempt || false,
+        googleEmail: data.email,
+        googleName: data.name,
+        dailyLimit: data.daily_limit,
+        checksUsed: data.checks_used,
+        checksRemaining: data.checks_remaining,
+        isAuthLoading: false,
+      });
+
+      await AsyncStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
+        isAuthenticated: true,
+        isExempt: data.is_exempt || false,
         googleEmail: data.email,
         googleName: data.name,
       }));
@@ -139,6 +187,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const data = response.data;
       set({
         isAuthenticated: false,
+        isExempt: false,
         googleEmail: null,
         googleName: null,
         dailyLimit: data.daily_limit,
@@ -149,6 +198,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       await AsyncStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
         isAuthenticated: false,
+        isExempt: false,
         googleEmail: null,
         googleName: null,
       }));

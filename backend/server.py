@@ -19,6 +19,7 @@ from urllib.parse import quote as url_quote, urlparse
 from datetime import datetime, timezone, timedelta
 import time
 import asyncio
+import secrets
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -71,6 +72,16 @@ GOOGLE_CLIENT_ID_ANDROID = os.environ.get('GOOGLE_CLIENT_ID_ANDROID', '')
 # Daily usage limits
 DAILY_LIMIT_ANON = int(os.environ.get('DAILY_LIMIT_ANON', '3'))
 DAILY_LIMIT_AUTH = int(os.environ.get('DAILY_LIMIT_AUTH', '5'))
+
+# Exempt devices and emails (unlimited checks)
+_exempt_devices_env = os.environ.get('EXEMPT_DEVICE_IDS', '')
+EXEMPT_DEVICE_IDS = {d.strip() for d in _exempt_devices_env.split(',') if d.strip()}
+_exempt_emails_env = os.environ.get('EXEMPT_EMAILS', '')
+EXEMPT_EMAILS = {e.strip().lower() for e in _exempt_emails_env.split(',') if e.strip()}
+
+# Admin account (manual email/password login)
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 
 # IST timezone
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -772,19 +783,37 @@ def today_ist() -> str:
     return datetime.now(IST).strftime('%Y-%m-%d')
 
 # --- Helper: get usage info for a device ---
+async def is_device_exempt(device_id: str) -> bool:
+    """Check if a device is exempt from daily limits."""
+    if device_id in EXEMPT_DEVICE_IDS:
+        return True
+    device = await devices_collection.find_one({"device_id": device_id})
+    if device:
+        email = (device.get("google_email") or device.get("admin_email") or "").lower()
+        if email and email in EXEMPT_EMAILS:
+            return True
+    return False
+
 async def get_device_usage(device_id: str) -> dict:
     """Return daily_limit, checks_used, checks_remaining, is_authenticated for a device."""
     device = await devices_collection.find_one({"device_id": device_id})
-    is_auth = bool(device and device.get("google_id"))
-    daily_limit = DAILY_LIMIT_AUTH if is_auth else DAILY_LIMIT_ANON
+    is_auth = bool(device and (device.get("google_id") or device.get("admin_email")))
     checks_used = await usage_collection.count_documents({"device_id": device_id, "date_ist": today_ist()})
+
+    exempt = await is_device_exempt(device_id)
+    if exempt:
+        daily_limit = 999999
+    else:
+        daily_limit = DAILY_LIMIT_AUTH if is_auth else DAILY_LIMIT_ANON
+
     return {
         "daily_limit": daily_limit,
         "checks_used": checks_used,
         "checks_remaining": max(0, daily_limit - checks_used),
         "is_authenticated": is_auth,
-        "email": (device.get("google_email") if device else None),
-        "name": (device.get("google_name") if device else None),
+        "is_exempt": exempt,
+        "email": (device.get("google_email") or device.get("admin_email") if device else None),
+        "name": (device.get("google_name") or device.get("admin_name") if device else None),
     }
 
 # --- Dependency: verify daily limit ---
@@ -858,6 +887,41 @@ async def google_auth(body: GoogleAuthRequest):
         **usage,
     }
 
+class AdminAuthRequest(BaseModel):
+    email: str
+    password: str
+    device_id: str
+
+@api_router.post("/auth/admin")
+async def admin_auth(body: AdminAuthRequest):
+    """Admin login with email/password."""
+    if not ADMIN_EMAIL or not ADMIN_PASSWORD:
+        raise HTTPException(status_code=404, detail="Admin login not configured")
+
+    if body.email.lower() != ADMIN_EMAIL.lower() or not secrets.compare_digest(body.password, ADMIN_PASSWORD):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    await devices_collection.update_one(
+        {"device_id": body.device_id},
+        {"$set": {
+            "admin_email": body.email.lower(),
+            "admin_name": "Admin",
+            "linked_at": datetime.now(timezone.utc).isoformat(),
+        }, "$setOnInsert": {
+            "device_id": body.device_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+
+    usage = await get_device_usage(body.device_id)
+    return {
+        "authenticated": True,
+        "email": body.email.lower(),
+        "name": "Admin",
+        **usage,
+    }
+
 @api_router.post("/auth/logout")
 async def logout(body: dict):
     """Unlink Google account from device."""
@@ -867,7 +931,7 @@ async def logout(body: dict):
 
     await devices_collection.update_one(
         {"device_id": device_id},
-        {"$set": {"google_id": None, "google_email": None, "google_name": None}},
+        {"$set": {"google_id": None, "google_email": None, "google_name": None, "admin_email": None, "admin_name": None}},
     )
 
     usage = await get_device_usage(device_id)

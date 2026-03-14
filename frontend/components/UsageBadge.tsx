@@ -5,13 +5,22 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 
 export function UsageBadge() {
-  const { checksRemaining, dailyLimit, checksUsed } = useAuthStore();
+  const { checksRemaining, dailyLimit, checksUsed, isExempt } = useAuthStore();
   const { colors } = useThemeStore();
 
-  const isLimitReached = checksRemaining <= 0;
-  const isLow = checksRemaining === 1;
+  const isLimitReached = !isExempt && checksRemaining <= 0;
+  const isLow = !isExempt && checksRemaining === 1;
 
   const badgeColor = isLimitReached ? colors.false : isLow ? '#F59E0B' : '#4CAF50';
+
+  let label: string;
+  if (isExempt) {
+    label = 'Unlimited checks';
+  } else if (isLimitReached) {
+    label = 'Daily limit reached';
+  } else {
+    label = `${checksRemaining}/${dailyLimit} checks left today`;
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
@@ -22,9 +31,7 @@ export function UsageBadge() {
           color={badgeColor}
         />
         <Text style={[styles.text, { color: colors.textPrimary }]}>
-          {isLimitReached
-            ? 'Daily limit reached'
-            : `${checksRemaining}/${dailyLimit} checks left today`}
+          {label}
         </Text>
       </View>
     </View>
