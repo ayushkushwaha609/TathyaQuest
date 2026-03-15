@@ -305,7 +305,7 @@ export default function HomeScreen() {
 
                   <TouchableOpacity
                     style={styles.drawerMenuItem}
-                    onPress={() => { closeDrawer(); Linking.openURL('https://ayushkushwaha609.github.io/TathyaCheck/privacy.html'); }}
+                    onPress={() => { closeDrawer(); Linking.openURL('https://ayushkushwaha609.github.io/TathyaQuest/privacy.html'); }}
                   >
                     <Ionicons name="shield-checkmark-outline" size={20} color={colors.textSecondary} />
                     <Text style={[styles.drawerMenuText, { color: colors.textPrimary }]}>Privacy Policy</Text>
