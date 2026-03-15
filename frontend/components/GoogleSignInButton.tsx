@@ -1,33 +1,45 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as AuthSession from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 
-WebBrowser.maybeCompleteAuthSession();
-
 const GOOGLE_CLIENT_ID_WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || '';
-const GOOGLE_CLIENT_ID_ANDROID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || '';
+
+// Configure Google Sign-In once at module level
+GoogleSignin.configure({
+  webClientId: GOOGLE_CLIENT_ID_WEB, // Required for getting idToken
+  offlineAccess: false,
+});
 
 export function GoogleSignInButton() {
   const { isAuthenticated, googleEmail, isAuthLoading, signInWithGoogle, signOut } = useAuthStore();
   const { colors } = useThemeStore();
 
-  const [request, response, promptAsync] = AuthSession.useAuthRequest({
-    webClientId: GOOGLE_CLIENT_ID_WEB,
-    androidClientId: GOOGLE_CLIENT_ID_ANDROID,
-  });
-
-  React.useEffect(() => {
-    if (response?.type === 'success') {
-      const idToken = response.authentication?.idToken;
+  const handleSignIn = async () => {
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
+      const idToken = response.data?.idToken;
       if (idToken) {
-        signInWithGoogle(idToken);
+        await signInWithGoogle(idToken);
+      } else {
+        Alert.alert('Sign-In Error', 'Could not get authentication token. Please try again.');
+      }
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // User cancelled — do nothing
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        // Sign-in already in progress
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert('Error', 'Google Play services are not available on this device.');
+      } else {
+        console.error('Google Sign-In error:', error);
+        Alert.alert('Sign-In Error', 'Something went wrong. Please try again.');
       }
     }
-  }, [response]);
+  };
 
   if (isAuthenticated) {
     return (
@@ -48,8 +60,8 @@ export function GoogleSignInButton() {
   return (
     <TouchableOpacity
       style={[styles.button, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-      onPress={() => promptAsync()}
-      disabled={!request || isAuthLoading}
+      onPress={handleSignIn}
+      disabled={isAuthLoading}
       activeOpacity={0.8}
     >
       {isAuthLoading ? (

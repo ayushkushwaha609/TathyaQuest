@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { getDeviceId } from '../utils/deviceId';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://tathya-api.onrender.com';
 const API_KEY = process.env.EXPO_PUBLIC_API_KEY || '';
@@ -200,6 +201,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
     set({ isAuthLoading: true });
     try {
+      // Sign out from native Google session
+      try { await GoogleSignin.signOut(); } catch {}
+
       const response = await axios.post(`${API_URL}/api/auth/logout`, {
         device_id: deviceId,
       }, {
