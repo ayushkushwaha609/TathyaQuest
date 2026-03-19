@@ -486,7 +486,7 @@ async def extract_search_queries(transcript: str) -> list[str]:
         logger.warning(f"Failed to extract search queries: {e}")
         return []
 
-async def web_search(query: str) -> str:
+async def web_search(query: str, timeout: float = 8.0) -> str:
     """Search the web using DuckDuckGo for fact-checking context"""
     if not query:
         return ""
@@ -494,9 +494,9 @@ async def web_search(query: str) -> str:
         def _sync_search():
             with DDGS() as ddgs:
                 return list(ddgs.text(query, max_results=5))
-        results = await asyncio.to_thread(_sync_search)
+        results = await asyncio.wait_for(asyncio.to_thread(_sync_search), timeout=timeout)
         if not results:
-            logger.warning("DuckDuckGo returned no results")
+            logger.warning(f"DuckDuckGo returned no results for: {query}")
             return ""
         snippets = []
         for r in results:
@@ -505,6 +505,9 @@ async def web_search(query: str) -> str:
             href = r.get("href", "")
             snippets.append(f"- {title}: {body} (Source: {href})")
         return "\n".join(snippets)
+    except asyncio.TimeoutError:
+        logger.warning(f"DuckDuckGo search timed out after {timeout}s for: {query}")
+        return ""
     except Exception as e:
         logger.warning(f"DuckDuckGo search failed: {e}")
         return ""
@@ -518,7 +521,8 @@ async def fact_check_transcript(transcript: str, language_code: str) -> dict:
     # Step 1: Extract ALL key claims, then run parallel web searches for each
     search_queries = await extract_search_queries(transcript)
     if search_queries:
-        web_results = await asyncio.gather(*[web_search(q) for q in search_queries])
+        web_results = await asyncio.gather(*[web_search(q, timeout=8.0) for q in search_queries], return_exceptions=True)
+        web_results = [r if isinstance(r, str) else "" for r in web_results]
         combined_web_context = ""
         for i, (q, ctx) in enumerate(zip(search_queries, web_results)):
             if ctx:
