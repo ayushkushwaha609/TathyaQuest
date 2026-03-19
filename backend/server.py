@@ -940,8 +940,17 @@ async def get_device_usage(device_id: str) -> dict:
     exempt = await is_device_exempt(device_id)
 
     today = today_ist()
-    yt_used = await usage_collection.count_documents({"device_id": device_id, "date_ist": today, "platform": "youtube"})
-    ig_used = await usage_collection.count_documents({"device_id": device_id, "date_ist": today, "platform": "instagram"})
+    email = (device.get("google_email") or device.get("admin_email") or "").lower() if device else ""
+
+    # For authenticated users: count by email (each account gets its own quota)
+    # For anonymous users: count by device_id
+    if is_auth and email:
+        usage_filter = {"email": email, "date_ist": today}
+    else:
+        usage_filter = {"device_id": device_id, "date_ist": today, "email": None}
+
+    yt_used = await usage_collection.count_documents({**usage_filter, "platform": "youtube"})
+    ig_used = await usage_collection.count_documents({**usage_filter, "platform": "instagram"})
     # Legacy docs (no platform field) count against Instagram
     legacy_used = await usage_collection.count_documents({"device_id": device_id, "date_ist": today, "platform": {"$exists": False}})
 
@@ -1285,10 +1294,15 @@ async def check_claim(request: Request, body: CheckRequest):
             upsert=True
         )
 
-        # Log usage with platform tag
+        # Log usage with platform tag and email (if authenticated)
         if device_id:
+            device_doc = await devices_collection.find_one({"device_id": device_id})
+            logged_email = None
+            if device_doc:
+                logged_email = (device_doc.get("google_email") or device_doc.get("admin_email") or "").lower() or None
             await usage_collection.insert_one({
                 "device_id": device_id,
+                "email": logged_email,
                 "date_ist": today_ist(),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "url_checked": url,
