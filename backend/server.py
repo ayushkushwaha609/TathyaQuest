@@ -439,6 +439,12 @@ async def extract_audio_rapidapi(video_id: str, output_dir: str) -> str:
 
 async def transcribe_audio(audio_path: str) -> str:
     """Transcribe audio using Groq Whisper (offloaded to thread to avoid blocking event loop)"""
+    file_size = os.path.getsize(audio_path)
+    # Estimate duration: assume ~128kbps for mp3, ~96kbps for m4a
+    bitrate = 96000 if audio_path.endswith('.m4a') else 128000
+    estimated_seconds = (file_size * 8) / bitrate
+    logger.info(f"Audio file: {audio_path}, size: {file_size} bytes, estimated duration: {estimated_seconds:.1f}s")
+
     def _sync_transcribe():
         with open(audio_path, "rb") as audio_file:
             return groq_client.audio.transcriptions.create(
@@ -455,8 +461,8 @@ async def extract_search_query(transcript: str) -> str:
             return groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "Extract the main factual claim from this transcript in one short English sentence (max 15 words). Return ONLY the claim, nothing else."},
-                    {"role": "user", "content": transcript[:2000]}
+                    {"role": "system", "content": "Extract the most important factual claim from this transcript in one short English sentence (max 15 words). Consider the entire transcript, not just the beginning. Return ONLY the claim, nothing else."},
+                    {"role": "user", "content": transcript[:8000]}
                 ],
                 temperature=0.0,
                 max_tokens=50,
@@ -494,8 +500,7 @@ async def web_search(query: str) -> str:
 
 async def fact_check_transcript(transcript: str, language_code: str) -> dict:
     """Fact-check the transcript using DuckDuckGo Search + Groq Llama"""
-    # Truncate transcript to ~1500 tokens
-    transcript = transcript[:6000]
+    transcript = transcript[:12000]
     
     lang_key, language_name = LANGUAGE_MAP.get(language_code, ("hindi", "Hindi"))
     
@@ -794,7 +799,7 @@ Always return ONLY valid JSON. No explanation outside the JSON object."""
 }}"""
         language_instruction = f"Provide ALL content in BOTH English AND {language_name}. Keep responses CONCISE to fit within limits."
 
-    user_prompt = f"""Watch this YouTube video carefully and transcribe its spoken content, then fact-check the claims made in it.
+    user_prompt = f"""Watch this YouTube video carefully from START TO FINISH — every second of it, not just the beginning. Transcribe ALL spoken content in the video completely, then fact-check the claims made throughout the entire video.
 {web_context_block}
 TASK: Fact-check ONLY the specific claims made in this video. Use the web search results (if available) to verify claims against current real-world information. Do not evaluate opinions, predictions, or subjective statements - only verifiable factual claims.
 
