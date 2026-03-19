@@ -5,29 +5,39 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 
-const GOOGLE_CLIENT_ID_WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || '';
-
-// Configure Google Sign-In once at module level
-GoogleSignin.configure({
-  webClientId: GOOGLE_CLIENT_ID_WEB, // Required for getting idToken
-  offlineAccess: false,
-});
+const GOOGLE_CLIENT_ID_WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || '702318540164-1ar7v9ldkgeasqpvqlrmfi6rv3j0vdk5.apps.googleusercontent.com';
 
 export function GoogleSignInButton() {
   const { isAuthenticated, googleEmail, isAuthLoading, signInWithGoogle, signOut } = useAuthStore();
   const { colors } = useThemeStore();
 
+  // Configure inside component to ensure native module is ready
+  React.useEffect(() => {
+    console.log('[GoogleSignIn] Configuring with webClientId:', GOOGLE_CLIENT_ID_WEB);
+    GoogleSignin.configure({
+      webClientId: GOOGLE_CLIENT_ID_WEB,
+      offlineAccess: true,
+    });
+  }, []);
+
   const handleSignIn = async () => {
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const response = await GoogleSignin.signIn();
-      const idToken = response.data?.idToken;
+      console.log('[GoogleSignIn] Full response:', JSON.stringify(response, null, 2));
+      
+      // Try multiple paths to find idToken
+      const idToken = response.data?.idToken ?? (response as any).idToken ?? (response as any).data?.serverAuthCode;
+      console.log('[GoogleSignIn] idToken found:', !!idToken);
+      
       if (idToken) {
         await signInWithGoogle(idToken);
       } else {
+        console.error('[GoogleSignIn] No idToken in response. Keys:', Object.keys(response.data || response));
         Alert.alert('Sign-In Error', 'Could not get authentication token. Please try again.');
       }
     } catch (error: any) {
+      console.error('[GoogleSignIn] Error:', error.code, error.message);
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         // User cancelled — do nothing
       } else if (error.code === statusCodes.IN_PROGRESS) {
@@ -35,8 +45,7 @@ export function GoogleSignInButton() {
       } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
         Alert.alert('Error', 'Google Play services are not available on this device.');
       } else {
-        console.error('Google Sign-In error:', error);
-        Alert.alert('Sign-In Error', 'Something went wrong. Please try again.');
+        Alert.alert('Sign-In Error', `Error: ${error.message || 'Unknown error'}`);
       }
     }
   };
