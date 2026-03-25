@@ -1,35 +1,38 @@
 /* ============================================
    TathyaQuest — Landing Page Styles
-   Sarvam-inspired clean design + app's indigo palette
+   Warm cream + saffron — elegant, approachable
    ============================================ */
 
 :root {
-  /* App dark mode palette */
-  --bg-primary: #0c0a1a;
-  --bg-secondary: #110e24;
-  --bg-card: rgba(30, 23, 80, 0.4);
-  --bg-card-solid: #1a1548;
-  --bg-card-hover: rgba(45, 37, 104, 0.5);
-  --border: rgba(196, 181, 253, 0.1);
-  --border-light: rgba(196, 181, 253, 0.2);
+  /* Backgrounds — warm paper feel */
+  --bg-primary: #fffaf3;
+  --bg-secondary: #fff5e9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fffdf8;
+  --border: rgba(180, 130, 70, 0.12);
+  --border-light: rgba(180, 130, 70, 0.2);
 
-  --text-primary: #f0edf8;
-  --text-secondary: #a8a0c0;
-  --text-muted: #7a7296;
+  --text-primary: #1a1207;
+  --text-secondary: #5c4a2a;
+  --text-muted: #9c8060;
 
-  /* Accent — warm saffron from app */
-  --accent: #f4a261;
-  --accent-light: #fbbf24;
-  --accent-glow: rgba(244, 162, 97, 0.12);
+  /* Saffron — the primary punch */
+  --accent: #e07b2a;
+  --accent-dark: #c4621a;
+  --accent-light: #f4a261;
+  --accent-glow: rgba(224, 123, 42, 0.1);
+  --accent-glow-strong: rgba(224, 123, 42, 0.18);
 
-  /* Deep indigo — the "punch" */
-  --indigo: #c4b5fd;
-  --indigo-solid: #2d1b69;
-  --indigo-glow: rgba(196, 181, 253, 0.08);
+  /* Deep indigo — secondary punch (CTAs, badges) */
+  --indigo: #2d1b69;
+  --indigo-hover: #3b2a80;
+  --indigo-light: #6c5bb5;
+  --indigo-glow: rgba(45, 27, 105, 0.07);
 
-  /* Gradients matching app */
-  --gradient-hero: linear-gradient(135deg, #c4b5fd 0%, #f4a261 50%, #fb7185 100%);
-  --gradient-subtle: linear-gradient(135deg, rgba(196,181,253,0.06), rgba(244,162,97,0.04));
+  /* Gradients */
+  --gradient-hero: linear-gradient(135deg, #e07b2a 0%, #c4621a 50%, #2d1b69 100%);
+  --gradient-warm: linear-gradient(135deg, #fff5e9, #fffaf3);
+  --gradient-card: linear-gradient(145deg, #ffffff, #fffcf7);
 
   --radius: 12px;
   --radius-lg: 20px;
@@ -37,6 +40,10 @@
 
   --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-devanagari: 'Noto Sans Devanagari', 'Inter', sans-serif;
+
+  --shadow-sm: 0 2px 8px rgba(100, 60, 10, 0.07);
+  --shadow-md: 0 6px 24px rgba(100, 60, 10, 0.1);
+  --shadow-lg: 0 16px 48px rgba(100, 60, 10, 0.12);
 }
 
 * {
@@ -64,30 +71,31 @@ body {
   padding: 0 24px;
 }
 
-/* ---- Nav (Sarvam-style: clean, floating, glass) ---- */
+/* ---- Nav ---- */
 .nav {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 100;
-  background: rgba(12, 10, 26, 0.7);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(255, 250, 243, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid transparent;
-  transition: border-color 0.3s, background 0.3s;
+  transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
 }
 
 .nav.scrolled {
   border-bottom-color: var(--border);
-  background: rgba(12, 10, 26, 0.9);
+  background: rgba(255, 250, 243, 0.95);
+  box-shadow: var(--shadow-sm);
 }
 
 .nav-inner {
   max-width: 1120px;
   margin: 0 auto;
   padding: 0 24px;
-  height: 72px;
+  height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -104,7 +112,7 @@ body {
   font-family: var(--font-devanagari);
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--indigo);
+  color: var(--accent);
 }
 
 .logo-sub {
@@ -133,18 +141,19 @@ body {
 }
 
 .nav-cta {
-  background: var(--indigo-solid) !important;
+  background: var(--indigo) !important;
   color: #fff !important;
   padding: 10px 24px !important;
   border-radius: var(--radius-full) !important;
   font-weight: 600 !important;
   transition: all 0.25s !important;
+  box-shadow: 0 2px 12px rgba(45, 27, 105, 0.25) !important;
 }
 
 .nav-cta:hover {
-  background: #3b2a80 !important;
+  background: var(--indigo-hover) !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(45, 27, 105, 0.4);
+  box-shadow: 0 4px 20px rgba(45, 27, 105, 0.35) !important;
 }
 
 .nav-toggle {
@@ -171,6 +180,7 @@ body {
   padding: 16px 24px 24px;
   gap: 16px;
   border-top: 1px solid var(--border);
+  background: var(--bg-primary);
 }
 
 .nav-mobile a {
@@ -190,25 +200,24 @@ body {
   margin-top: 8px;
 }
 
-/* ---- Hero (Sarvam-inspired: generous spacing, clean type) ---- */
+/* ---- Hero ---- */
 .hero {
   position: relative;
-  padding: 180px 0 120px;
+  padding: 160px 0 110px;
   text-align: center;
   overflow: hidden;
 }
 
-/* Decorative blobs — matching app */
 .hero-glow {
   position: absolute;
-  top: -100px;
+  top: -80px;
   left: 50%;
   transform: translateX(-50%);
   width: 1200px;
-  height: 900px;
+  height: 800px;
   background:
-    radial-gradient(ellipse at 30% 40%, rgba(196,181,253,0.07) 0%, rgba(196,181,253,0.02) 30%, transparent 70%),
-    radial-gradient(ellipse at 70% 60%, rgba(244,162,97,0.04) 0%, rgba(244,162,97,0.01) 30%, transparent 70%);
+    radial-gradient(ellipse at 30% 40%, rgba(224, 123, 42, 0.08) 0%, rgba(224, 123, 42, 0.02) 35%, transparent 65%),
+    radial-gradient(ellipse at 70% 55%, rgba(45, 27, 105, 0.05) 0%, rgba(45, 27, 105, 0.01) 35%, transparent 65%);
   pointer-events: none;
   filter: blur(40px);
 }
@@ -218,12 +227,12 @@ body {
   align-items: center;
   gap: 8px;
   padding: 8px 18px;
-  background: var(--indigo-glow);
-  border: 1px solid rgba(196,181,253,0.15);
+  background: var(--accent-glow);
+  border: 1px solid rgba(224, 123, 42, 0.2);
   border-radius: var(--radius-full);
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--indigo);
+  color: var(--accent-dark);
   letter-spacing: 0.02em;
   margin-bottom: 32px;
 }
@@ -231,21 +240,21 @@ body {
 .badge-dot {
   width: 6px;
   height: 6px;
-  background: var(--indigo);
+  background: var(--accent);
   border-radius: 50%;
   animation: pulse-dot 2s infinite;
 }
 
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  50% { opacity: 0.35; }
 }
 
 .hero-title {
   font-size: clamp(2.75rem, 6vw, 4.5rem);
   font-weight: 800;
   line-height: 1.08;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.03em;
   margin-bottom: 28px;
   color: var(--text-primary);
 }
@@ -290,26 +299,29 @@ body {
 }
 
 .btn-primary {
-  background: var(--indigo-solid);
+  background: var(--indigo);
   color: #fff;
+  box-shadow: 0 4px 18px rgba(45, 27, 105, 0.28);
 }
 
 .btn-primary:hover {
-  background: #3b2a80;
+  background: var(--indigo-hover);
   transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(45, 27, 105, 0.4);
+  box-shadow: 0 8px 32px rgba(45, 27, 105, 0.38);
 }
 
 .btn-secondary {
-  background: rgba(196,181,253,0.08);
+  background: #fff;
   color: var(--text-primary);
-  border: 1px solid var(--border-light);
+  border: 1.5px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary:hover {
-  background: rgba(196,181,253,0.14);
-  border-color: var(--indigo);
+  border-color: var(--accent-light);
+  background: var(--bg-secondary);
   transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .hero-langs {
@@ -323,17 +335,17 @@ body {
   font-family: var(--font-devanagari);
   font-size: 1.1rem;
   color: var(--text-muted);
-  transition: color 0.3s;
+  transition: color 0.25s;
   cursor: default;
 }
 
 .hero-lang:hover {
-  color: var(--indigo);
+  color: var(--accent);
 }
 
-/* ---- Sections (Sarvam-style: very generous vertical rhythm) ---- */
+/* ---- Sections ---- */
 .section {
-  padding: 120px 0;
+  padding: 112px 0;
   position: relative;
 }
 
@@ -341,7 +353,6 @@ body {
   background: var(--bg-secondary);
 }
 
-/* Subtle top fade between sections */
 .section-dark::before {
   content: '';
   position: absolute;
@@ -360,10 +371,10 @@ body {
 
 .section-label {
   display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   color: var(--accent);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   margin-bottom: 16px;
 }
@@ -374,17 +385,18 @@ body {
   letter-spacing: -0.025em;
   margin-bottom: 16px;
   line-height: 1.15;
+  color: var(--text-primary);
 }
 
 .section-sub {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   color: var(--text-secondary);
   max-width: 520px;
   margin: 0 auto;
   line-height: 1.7;
 }
 
-/* ---- Pipeline (cleaner, more spacious) ---- */
+/* ---- Pipeline ---- */
 .pipeline {
   display: flex;
   align-items: flex-start;
@@ -405,34 +417,37 @@ body {
   width: 60px;
   height: 60px;
   border-radius: 16px;
-  background: var(--indigo-glow);
-  border: 1px solid rgba(196,181,253,0.12);
+  background: var(--accent-glow);
+  border: 1.5px solid rgba(224, 123, 42, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 18px;
-  color: var(--indigo);
+  color: var(--accent);
   transition: all 0.3s;
 }
 
 .pipeline-step:hover .step-icon {
-  background: rgba(196,181,253,0.14);
-  border-color: rgba(196,181,253,0.25);
+  background: var(--accent-glow-strong);
+  border-color: rgba(224, 123, 42, 0.3);
   transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(224, 123, 42, 0.12);
 }
 
 .step-num {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--accent);
   margin-bottom: 8px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
 }
 
 .pipeline-step h3 {
   font-size: 1rem;
   font-weight: 700;
   margin-bottom: 10px;
+  color: var(--text-primary);
 }
 
 .pipeline-step p {
@@ -442,14 +457,14 @@ body {
 }
 
 .pipeline-arrow {
-  color: var(--text-muted);
+  color: var(--accent-light);
   font-size: 1.5rem;
   margin-top: 68px;
   flex-shrink: 0;
-  opacity: 0.4;
+  opacity: 0.45;
 }
 
-/* ---- Moat (Sarvam-style: two-col with strong visual) ---- */
+/* ---- Moat ---- */
 .moat-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -493,24 +508,26 @@ body {
   height: 48px;
   min-width: 48px;
   border-radius: 14px;
-  background: var(--indigo-glow);
-  border: 1px solid rgba(196,181,253,0.12);
+  background: var(--accent-glow);
+  border: 1.5px solid rgba(224, 123, 42, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--indigo);
+  color: var(--accent);
   transition: all 0.3s;
 }
 
 .moat-feature:hover .moat-feature-icon {
-  background: rgba(196,181,253,0.14);
+  background: var(--accent-glow-strong);
   transform: scale(1.05);
+  box-shadow: 0 4px 14px rgba(224, 123, 42, 0.1);
 }
 
 .moat-feature h4 {
   font-size: 0.95rem;
   font-weight: 600;
   margin-bottom: 4px;
+  color: var(--text-primary);
 }
 
 .moat-feature p {
@@ -519,23 +536,20 @@ body {
   line-height: 1.55;
 }
 
-/* ---- Moat Visual Card (app-style verdict card) ---- */
+/* ---- Moat Card ---- */
 .moat-visual {
   display: flex;
   justify-content: center;
 }
 
 .moat-card {
-  background: rgba(30, 23, 80, 0.5);
-  border: 1px solid rgba(196,181,253,0.12);
+  background: var(--gradient-card);
+  border: 1.5px solid var(--border-light);
   border-radius: var(--radius-lg);
   padding: 32px;
   max-width: 380px;
   width: 100%;
-  box-shadow:
-    0 24px 64px rgba(0,0,0,0.3),
-    0 0 0 1px rgba(196,181,253,0.05);
-  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-lg);
 }
 
 .moat-card-header {
@@ -554,8 +568,9 @@ body {
 }
 
 .verdict-false {
-  background: rgba(248,113,113,0.12);
-  color: #f87171;
+  background: rgba(199, 91, 57, 0.1);
+  color: #c4621a;
+  border: 1px solid rgba(199, 91, 57, 0.2);
 }
 
 .moat-card-confidence {
@@ -596,8 +611,8 @@ body {
 }
 
 .moat-card-audio {
-  background: rgba(196,181,253,0.06);
-  border: 1px solid rgba(196,181,253,0.1);
+  background: var(--accent-glow);
+  border: 1.5px solid rgba(224, 123, 42, 0.15);
   border-radius: var(--radius);
   padding: 14px 18px;
   display: flex;
@@ -614,7 +629,7 @@ body {
 
 .audio-wave span {
   width: 3px;
-  background: var(--indigo);
+  background: var(--accent);
   border-radius: 3px;
   animation: wave 1.2s ease-in-out infinite;
 }
@@ -642,11 +657,11 @@ body {
 
 .audio-label {
   font-size: 0.8rem;
-  color: var(--indigo);
+  color: var(--accent-dark);
   font-weight: 500;
 }
 
-/* ---- Languages Grid (elevated card style) ---- */
+/* ---- Languages Grid ---- */
 .lang-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -657,20 +672,19 @@ body {
 
 .lang-card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 36px 24px;
   text-align: center;
   transition: all 0.35s cubic-bezier(.25,1,.5,1);
   cursor: default;
-  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
 }
 
 .lang-card:hover {
-  border-color: rgba(196,181,253,0.25);
-  background: var(--bg-card-hover);
+  border-color: var(--accent-light);
   transform: translateY(-6px);
-  box-shadow: 0 16px 48px rgba(0,0,0,0.2), 0 0 0 1px rgba(196,181,253,0.1);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(224, 123, 42, 0.08);
 }
 
 .lang-native {
@@ -694,12 +708,12 @@ body {
 }
 
 .lang-code {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
 
-/* ---- Tech Grid (Sarvam-style: clean cards with subtle hover) ---- */
+/* ---- Tech Grid ---- */
 .tech-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -708,17 +722,17 @@ body {
 
 .tech-card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 36px 28px;
   transition: all 0.35s cubic-bezier(.25,1,.5,1);
-  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
 }
 
 .tech-card:hover {
-  border-color: rgba(196,181,253,0.2);
+  border-color: rgba(224, 123, 42, 0.22);
   transform: translateY(-4px);
-  box-shadow: 0 16px 48px rgba(0,0,0,0.15);
+  box-shadow: var(--shadow-lg);
 }
 
 .tech-card-icon {
@@ -730,6 +744,7 @@ body {
   font-size: 1.1rem;
   font-weight: 700;
   margin-bottom: 10px;
+  color: var(--text-primary);
 }
 
 .tech-card p {
@@ -742,12 +757,12 @@ body {
 .tech-tag {
   display: inline-block;
   padding: 5px 14px;
-  background: var(--indigo-glow);
-  border: 1px solid rgba(196,181,253,0.1);
+  background: var(--accent-glow);
+  border: 1px solid rgba(224, 123, 42, 0.18);
   border-radius: var(--radius-full);
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--indigo);
+  color: var(--accent-dark);
   letter-spacing: 0.03em;
 }
 
@@ -768,8 +783,8 @@ body {
   width: 700px;
   height: 500px;
   background:
-    radial-gradient(ellipse at 40% 50%, rgba(196,181,253,0.06), transparent 60%),
-    radial-gradient(ellipse at 60% 50%, rgba(244,162,97,0.04), transparent 60%);
+    radial-gradient(ellipse at 40% 50%, rgba(224, 123, 42, 0.07), transparent 60%),
+    radial-gradient(ellipse at 60% 50%, rgba(45, 27, 105, 0.04), transparent 60%);
   pointer-events: none;
 }
 
@@ -779,6 +794,7 @@ body {
   letter-spacing: -0.025em;
   margin-bottom: 16px;
   line-height: 1.15;
+  color: var(--text-primary);
 }
 
 .cta-sub {
@@ -791,10 +807,11 @@ body {
   line-height: 1.7;
 }
 
-/* ---- Footer (Sarvam-style: minimal, clean) ---- */
+/* ---- Footer ---- */
 .footer {
-  border-top: 1px solid var(--border);
+  border-top: 1.5px solid var(--border);
   padding: 48px 0 36px;
+  background: var(--bg-secondary);
 }
 
 .footer-top {
@@ -818,7 +835,7 @@ body {
 }
 
 .footer-links a:hover {
-  color: var(--text-primary);
+  color: var(--accent);
 }
 
 .footer-bottom {
@@ -832,24 +849,24 @@ body {
   color: var(--text-muted);
 }
 
+/* ---- Powered Badge ---- */
 .powered-badge {
   display: inline-flex;
   align-items: center;
   gap: 12px;
   padding: 10px 22px 10px 14px;
-  background: linear-gradient(135deg, rgba(196,181,253,0.08), rgba(244,162,97,0.04));
-  border: 1px solid rgba(196,181,253,0.15);
+  background: #fff;
+  border: 1.5px solid var(--border-light);
   border-radius: var(--radius);
   text-decoration: none;
   transition: all 0.35s cubic-bezier(.25,1,.5,1);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  box-shadow: var(--shadow-sm);
 }
 
 .powered-badge:hover {
-  background: linear-gradient(135deg, rgba(196,181,253,0.14), rgba(244,162,97,0.08));
-  border-color: rgba(196,181,253,0.3);
+  border-color: var(--accent-light);
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.25), 0 0 0 1px rgba(196,181,253,0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .powered-icon {
@@ -858,9 +875,9 @@ body {
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: rgba(196,181,253,0.1);
+  background: var(--accent-glow);
   border-radius: 8px;
-  color: var(--indigo);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -880,7 +897,7 @@ body {
 
 .powered-name {
   font-size: 0.95rem;
-  color: var(--indigo);
+  color: var(--accent-dark);
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -894,7 +911,7 @@ body {
 
 .powered-badge:hover .powered-arrow {
   transform: translate(2px, -2px);
-  color: var(--indigo);
+  color: var(--accent);
 }
 
 /* ---- Disclaimer ---- */
@@ -905,8 +922,8 @@ body {
   max-width: 600px;
   margin-top: 36px;
   padding: 16px 22px;
-  background: rgba(196, 181, 253, 0.04);
-  border: 1px solid rgba(196, 181, 253, 0.08);
+  background: rgba(224, 123, 42, 0.04);
+  border: 1px solid rgba(224, 123, 42, 0.12);
   border-radius: var(--radius);
   text-align: left;
   font-size: 0.85rem;
@@ -924,11 +941,11 @@ body {
   color: var(--text-primary);
 }
 
-/* ---- Animations (Sarvam-style: smooth cubic bezier) ---- */
+/* ---- Animations ---- */
 .fade-in {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.7s cubic-bezier(.25,1,.5,1), transform 0.7s cubic-bezier(.25,1,.5,1);
+  transform: translateY(24px);
+  transition: opacity 0.65s cubic-bezier(.25,1,.5,1), transform 0.65s cubic-bezier(.25,1,.5,1);
 }
 
 .fade-in.visible {
@@ -964,12 +981,12 @@ body {
   transition: all 0.3s cubic-bezier(.25,1,.5,1);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .donate-float:hover {
   transform: translateY(-3px);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow-lg);
 }
 
 .donate-float img {
@@ -1039,7 +1056,7 @@ body {
   }
 
   .hero {
-    padding: 140px 0 80px;
+    padding: 130px 0 80px;
   }
 
   .section {
