@@ -130,6 +130,81 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Opinion indicator phrases (English, Hindi, Urdu-influenced, Hinglish)
+OPINION_KEYWORDS = [
+    # English
+    "in my opinion", "in my view", "i believe", "i think", "i feel",
+    "personally", "from my experience", "from my perspective", "it's my view",
+    "as far as i'm concerned", "i would say", "to me it seems", "my take is",
+    "i'd argue", "i reckon", "in my estimation", "it seems to me",
+    "i'm of the opinion", "based on my experience", "i've always felt",
+    "my personal opinion", "i personally feel", "the way i see it",
+    "in my humble opinion", "speaking for myself", "it is my belief",
+    # Hindi
+    "mere hisab se", "mera manna hai", "main manta hun", "jahan tak mujhe lagta hai",
+    "jahan tak mera manna hai", "mere anusaar", "meri rai mein", "mera khyal hai",
+    "mere nazariye se", "mujhe lagta hai", "mere experience mein", "main samajhta hun",
+    "meri samajh mein", "mere ko lagta hai", "meri soch mein", "mere hisaab mein",
+    "main yeh maanta hun", "meri personal opinion hai", "mere vichar mein",
+    "meri drishti mein", "mere mantavya mein", "mere anubhav mein",
+    # Urdu-influenced
+    "meri rai ye hai", "mere mutabiq", "mera guman hai", "meri nazar mein",
+    "mere khayal mein", "meri qaum mein",
+    # Hinglish
+    "personally mujhe lagta hai", "my personal view hai", "mere hisab se dekho",
+    "mere experience se", "i personally manta hun", "mera personal opinion hai",
+    "mere hisab se baat karu to",
+]
+
+# Localized opinion messages shown to users when content is pure opinion
+OPINION_MESSAGES = {
+    "english": (
+        "This video expresses a personal opinion or belief. "
+        "TathyaCheck can only verify factual claims — statements that can be proven true or false. "
+        "No verifiable facts were identified in this content."
+    ),
+    "hindi": (
+        "यह वीडियो एक व्यक्तिगत राय या विश्वास व्यक्त करता है। "
+        "TathyaCheck केवल तथ्यात्मक दावों की जाँच कर सकता है — ऐसे कथन जिन्हें सच या झूठ साबित किया जा सके। "
+        "इस सामग्री में कोई सत्यापन योग्य तथ्य नहीं मिले।"
+    ),
+    "tamil": (
+        "இந்த வீடியோ ஒரு தனிப்பட்ட கருத்தை வெளிப்படுத்துகிறது. "
+        "TathyaCheck மட்டுமே நிரூபிக்கக்கூடிய உண்மைகளை சரிபார்க்க முடியும். "
+        "இந்த உள்ளடக்கத்தில் சரிபார்க்கக்கூடிய வாதங்கள் எதுவும் இல்லை."
+    ),
+    "telugu": (
+        "ఈ వీడియో వ్యక్తిగత అభిప్రాయాన్ని వ్యక్తపరుస్తోంది. "
+        "TathyaCheck కేవలం నిరూపించదగిన వాస్తవాలను మాత్రమే ధృవీకరించగలదు. "
+        "ఈ కంటెంట్‌లో ధృవీకరించదగిన వాస్తవాలు ఏవీ కనుగొనబడలేదు."
+    ),
+    "kannada": (
+        "ಈ ವೀಡಿಯೊ ವ್ಯಕ್ತಿಗತ ಅಭಿಪ್ರಾಯವನ್ನು ವ್ಯಕ್ತಪಡಿಸುತ್ತದೆ. "
+        "TathyaCheck ಮಾತ್ರ ಸಾಬೀತುಪಡಿಸಬಹುದಾದ ಸತ್ಯಗಳನ್ನು ಪರಿಶೀಲಿಸಬಲ್ಲದು. "
+        "ಈ ವಿಷಯದಲ್ಲಿ ಯಾವುದೇ ಪರಿಶೀಲಿಸಬಹುದಾದ ಸತ್ಯಗಳು ಕಂಡುಬಂದಿಲ್ಲ."
+    ),
+    "malayalam": (
+        "ഈ വീഡിയോ ഒരു വ്യക്തിഗത അഭിപ്രായം പ്രകടിപ്പിക്കുന്നു. "
+        "TathyaCheck-ന് മാത്രമേ തെളിയിക്കാവുന്ന വസ്തുതകൾ പരിശോധിക്കാൻ കഴിയൂ. "
+        "ഈ ഉള്ളടക്കത്തിൽ പരിശോധിക്കാവുന്ന വസ്തുതകൾ ഒന്നും കണ്ടെത്തിയില്ല."
+    ),
+    "marathi": (
+        "हा व्हिडिओ एक वैयक्तिक मत व्यक्त करतो. "
+        "TathyaCheck केवळ सिद्ध करता येण्याजोग्या तथ्यात्मक दाव्यांची तपासणी करू शकतो. "
+        "या सामग्रीमध्ये कोणतेही सत्यापन करण्यायोग्य तथ्य आढळले नाही."
+    ),
+    "bengali": (
+        "এই ভিডিওটি একটি ব্যক্তিগত মতামত প্রকাশ করে। "
+        "TathyaCheck শুধুমাত্র প্রমাণযোগ্য তথ্যমূলক দাবিগুলি যাচাই করতে পারে। "
+        "এই বিষয়বস্তুতে কোনো যাচাইযোগ্য তথ্য পাওয়া যায়নি।"
+    ),
+    "gujarati": (
+        "આ વિડિઓ એક વ્યક્તિગત અભિપ્રાય વ્યક્ત કરે છે. "
+        "TathyaCheck ફક્ત સાબિત કરી શકાય તેવા તથ્યાત્મક દાવાઓ ચકાસી શકે છે. "
+        "આ સામગ્રીમાં કોઈ ચકાસી શકાય તેવા તથ્યો મળ્યા નથી."
+    ),
+}
+
 # Language mapping
 LANGUAGE_MAP = {
     "en-IN": ("english", "English"),
@@ -538,7 +613,8 @@ async def fact_check_transcript(transcript: str, language_code: str) -> dict:
 {combined_web_context}
 \"\"\"\n"""
 
-    system_prompt = """You are an expert fact-checker with broad knowledge across science, history, current affairs, technology, health, finance, and general knowledge.
+    opinion_keywords_str = ", ".join(f'"{k}"' for k in OPINION_KEYWORDS)
+    system_prompt = f"""You are an expert fact-checker with broad knowledge across health, nutrition, medicine, fitness, traditional medicine, science, history, technology, finance, law, and general knowledge. Your primary focus is general fact-checking: health tips, medical information, and factual claims.
 
 CRITICAL RULES:
 1. Read the ENTIRE transcript from start to finish. Identify EVERY distinct factual claim made throughout the video — do NOT stop at the first topic.
@@ -549,6 +625,7 @@ CRITICAL RULES:
 6. USE the web search results (provided per claim) to verify against up-to-date information.
 7. If any single claim is FALSE or MISLEADING, the overall verdict must reflect that.
 8. The overall verdict should be the WORST verdict across all individual claims (e.g., if one claim is FALSE and another TRUE, overall = FALSE).
+9. OPINION DETECTION: If the video's PRIMARY content is personal opinions, subjective views, or beliefs with no verifiable factual claims — especially when the speaker uses phrases like {opinion_keywords_str} — return verdict "OPINION". However, if factual claims are embedded within opinion framing (e.g. "I believe turmeric cures cancer"), fact-check the embedded factual claim instead of returning OPINION.
 
 Always return ONLY valid JSON. No explanation outside the JSON object."""
 
@@ -556,10 +633,10 @@ Always return ONLY valid JSON. No explanation outside the JSON object."""
 
     if is_english_only:
         json_template = """{
-  "claim": "Overall summary: the video makes N claims about [topics]. Example: 'Video makes 2 claims: X and Y'",
-  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE",
-  "confidence": integer 0-100,
-  "category": "health" or "science" or "history" or "technology" or "finance" or "news" or "general",
+  "claim": "Overall summary: the video makes N claims about [topics]. Example: 'Video makes 2 claims: X and Y'. If verdict is OPINION, summarise what opinion is expressed.",
+  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE" or "OPINION",
+  "confidence": integer 0-100 (set to 0 if verdict is OPINION),
+  "category": "nutrition" or "medicine" or "fitness" or "ayurveda_traditional" or "mental_health" or "science" or "history" or "technology" or "finance_economy" or "law_rights" or "general",
   "key_points": [
     "CLAIM: <first claim> → VERDICT: <verdict> — <reason>",
     "CLAIM: <second claim> → VERDICT: <verdict> — <reason>",
@@ -575,11 +652,11 @@ Always return ONLY valid JSON. No explanation outside the JSON object."""
         language_instruction = "Provide ALL content in English."
     else:
         json_template = f"""{{
-  "claim": "Overall summary of ALL claims in video (English)",
+  "claim": "Overall summary of ALL claims in video (English). If verdict is OPINION, summarise what opinion is expressed.",
   "claim_{lang_key}": "Same summary in {language_name}",
-  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE",
-  "confidence": integer 0-100,
-  "category": "health" or "science" or "history" or "technology" or "finance" or "news" or "general",
+  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE" or "OPINION",
+  "confidence": integer 0-100 (set to 0 if verdict is OPINION),
+  "category": "nutrition" or "medicine" or "fitness" or "ayurveda_traditional" or "mental_health" or "science" or "history" or "technology" or "finance_economy" or "law_rights" or "general",
   "key_points": [
     "CLAIM: <first claim> → VERDICT: <verdict> — <reason>",
     "CLAIM: <second claim> → VERDICT: <verdict> — <reason>",
@@ -661,6 +738,33 @@ def _parse_fact_check_json(response_text: str, lang_key: str, language_name: str
         result = json.loads(response_text)
 
         is_english_only = (lang_key == "english")
+
+        # Handle OPINION verdict — override verdict_text with localized message
+        if result.get("verdict") == "OPINION":
+            opinion_msg_en = OPINION_MESSAGES.get("english", "")
+            opinion_msg_regional = OPINION_MESSAGES.get(lang_key, opinion_msg_en)
+            combined = f"{opinion_msg_en}\n\n{opinion_msg_regional}" if not is_english_only else opinion_msg_en
+            return {
+                "claim": result.get("claim", "Personal opinion expressed"),
+                "claim_regional": result.get(f"claim_{lang_key}", result.get("claim", "")) if not is_english_only else result.get("claim", "Personal opinion expressed"),
+                "verdict": "OPINION",
+                "confidence": 0,
+                "reason": opinion_msg_en,
+                "reason_regional": opinion_msg_regional if not is_english_only else opinion_msg_en,
+                "verdict_text": combined,
+                "verdict_text_english": opinion_msg_en,
+                "verdict_text_regional": opinion_msg_regional if not is_english_only else opinion_msg_en,
+                "category": result.get("category", "general"),
+                "key_points": [],
+                "key_points_regional": [],
+                "fact_details": "",
+                "fact_details_regional": "",
+                "what_to_know": "",
+                "what_to_know_regional": "",
+                "sources_note": "",
+                "why_misleading": "",
+                "why_misleading_regional": ""
+            }
 
         if is_english_only:
             verdict_text_english = result.get("verdict_spoken", result.get("reason", ""))
@@ -778,7 +882,8 @@ async def fact_check_youtube_gemini(url: str, language_code: str) -> dict:
 {web_context}
 \"\"\"\n"""
 
-    system_prompt = """You are an expert fact-checker with broad knowledge across topics including science, history, current affairs, technology, health, finance, and general knowledge.
+    opinion_keywords_str = ", ".join(f'"{k}"' for k in OPINION_KEYWORDS)
+    system_prompt = f"""You are an expert fact-checker with broad knowledge across health, nutrition, medicine, fitness, traditional medicine, science, history, technology, finance, law, and general knowledge. Your primary focus is general fact-checking: health tips, medical information, and factual claims.
 
 IMPORTANT RULES:
 1. First, carefully watch and transcribe the spoken content of the video.
@@ -789,6 +894,7 @@ IMPORTANT RULES:
 6. Provide thorough, educational explanations that help users understand the truth.
 7. USE the web search results provided to verify claims against up-to-date real-world information. Prefer web search evidence over your training data for current events and recent facts.
 8. If web search results contradict a claim, cite the source in your sources_note.
+9. OPINION DETECTION: If the video's PRIMARY content is personal opinions, subjective views, or beliefs with no verifiable factual claims — especially when the speaker uses phrases like {opinion_keywords_str} — return verdict "OPINION". However, if factual claims are embedded within opinion framing (e.g. "I believe turmeric cures cancer"), fact-check the embedded factual claim instead of returning OPINION.
 
 Always return ONLY valid JSON. No explanation outside the JSON object."""
 
@@ -796,10 +902,10 @@ Always return ONLY valid JSON. No explanation outside the JSON object."""
 
     if is_english_only:
         json_template = """{
-  "claim": "One clear sentence summarizing the main claim",
-  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE",
-  "confidence": integer 0-100 (use specific numbers like 73, 84, 91),
-  "category": "health" or "science" or "history" or "technology" or "finance" or "news" or "general",
+  "claim": "One clear sentence summarizing the main claim. If verdict is OPINION, summarise what opinion is expressed.",
+  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE" or "OPINION",
+  "confidence": integer 0-100 (use specific numbers like 73, 84, 91; set to 0 if verdict is OPINION),
+  "category": "nutrition" or "medicine" or "fitness" or "ayurveda_traditional" or "mental_health" or "science" or "history" or "technology" or "finance_economy" or "law_rights" or "general",
   "key_points": ["Point 1", "Point 2"],
   "reason": "1-2 sentences explaining verdict",
   "why_misleading": "If MISLEADING/PARTIALLY_TRUE: 1-2 sentences why. Otherwise empty string.",
@@ -811,11 +917,11 @@ Always return ONLY valid JSON. No explanation outside the JSON object."""
         language_instruction = "Provide ALL content in English. Keep responses CONCISE to fit within limits."
     else:
         json_template = f"""{{
-  "claim": "One clear sentence summarizing the main claim (English)",
+  "claim": "One clear sentence summarizing the main claim (English). If verdict is OPINION, summarise what opinion is expressed.",
   "claim_{lang_key}": "Same claim in {language_name}",
-  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE",
-  "confidence": integer 0-100 (use specific numbers like 73, 84, 91),
-  "category": "health" or "science" or "history" or "technology" or "finance" or "news" or "general",
+  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "PARTIALLY_TRUE" or "OPINION",
+  "confidence": integer 0-100 (use specific numbers like 73, 84, 91; set to 0 if verdict is OPINION),
+  "category": "nutrition" or "medicine" or "fitness" or "ayurveda_traditional" or "mental_health" or "science" or "history" or "technology" or "finance_economy" or "law_rights" or "general",
   "key_points": ["Point 1 English", "Point 2 English"],
   "key_points_{lang_key}": ["Point 1 {language_name}", "Point 2 {language_name}"],
   "reason": "1-2 sentences explaining verdict in English",

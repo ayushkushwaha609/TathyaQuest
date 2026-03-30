@@ -19,6 +19,8 @@ const getVerdictConfig = (verdict: string, c: ThemeColors) => {
       return { color: c.turmeric, bgColor: c.turmericBg, borderColor: c.turmeric, icon: 'warning' as const, label: 'MISLEADING', labelHindi: 'भ्रामक' };
     case 'PARTIALLY_TRUE':
       return { color: c.deepTeal, bgColor: c.partialBg, borderColor: c.deepTeal, icon: 'remove-circle' as const, label: 'PARTIALLY TRUE', labelHindi: 'आंशिक सच' };
+    case 'OPINION':
+      return { color: c.deepIndigo, bgColor: c.card, borderColor: c.deepIndigo, icon: 'chatbubble-ellipses' as const, label: 'OPINION', labelHindi: 'व्यक्तिगत राय' };
     default:
       return { color: c.textSecondary, bgColor: c.card, borderColor: c.textSecondary, icon: 'help-circle' as const, label: 'UNKNOWN', labelHindi: 'अज्ञात' };
   }
@@ -26,12 +28,19 @@ const getVerdictConfig = (verdict: string, c: ThemeColors) => {
 
 const getCategoryIcon = (category: string) => {
   switch (category?.toLowerCase()) {
-    case 'health': return 'fitness';
+    case 'nutrition': return 'restaurant';
+    case 'medicine': return 'medkit';
+    case 'fitness': return 'barbell';
+    case 'ayurveda_traditional': return 'leaf';
+    case 'mental_health': return 'happy';
     case 'science': return 'flask';
     case 'history': return 'time';
     case 'technology': return 'hardware-chip';
+    case 'finance_economy': return 'cash';
+    case 'law_rights': return 'document-text';
+    // legacy fallbacks
+    case 'health': return 'medkit';
     case 'finance': return 'cash';
-    case 'news': return 'newspaper';
     default: return 'information-circle';
   }
 };
@@ -183,8 +192,8 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({ result }) => {
             <Text style={[styles.verdictHindi, { color: config.color }]}>{config.labelHindi}</Text>
           </View>
 
-          {/* Truth Score */}
-          {(() => {
+          {/* Truth Score — hidden for opinions */}
+          {result.verdict !== 'OPINION' && (() => {
             let truthScore: number;
             switch (result.verdict) {
               case 'TRUE':         truthScore = result.confidence; break;
@@ -241,8 +250,8 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({ result }) => {
             </View>
           )}
 
-          {/* Full Verdict — expandable */}
-          {(result.verdict_text_english || result.verdict_text_regional) && (
+          {/* Full Verdict — expandable, hidden for opinions (message already in Quick Verdict) */}
+          {result.verdict !== 'OPINION' && (result.verdict_text_english || result.verdict_text_regional) && (
             <View style={styles.section}>
               <TouchableOpacity
                 style={[styles.fullVerdictToggle, { backgroundColor: c.card, borderColor: config.borderColor }]}
