@@ -1400,12 +1400,19 @@ async def cancel_subscription(request: Request):
     if not sub:
         raise HTTPException(status_code=404, detail={"error": "no_subscription", "message": "No active subscription found."})
 
-    try:
-        # cancel_at_cycle_end=1 means access continues until period end
-        rzp_client.subscription.cancel(sub["razorpay_subscription_id"], {"cancel_at_cycle_end": 1})
-    except Exception as e:
-        logger.error(f"Razorpay cancellation failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to cancel subscription. Please try again.")
+    rzp_sub_id = sub.get("razorpay_subscription_id", "")
+    is_real_rzp_sub = rzp_sub_id.startswith("sub_")
+
+    if is_real_rzp_sub:
+        try:
+            # cancel_at_cycle_end=1 means access continues until period end
+            rzp_client.subscription.cancel(rzp_sub_id, {"cancel_at_cycle_end": 1})
+        except Exception as e:
+            logger.error(f"Razorpay cancellation failed: {e}")
+            raise HTTPException(status_code=500, detail="Failed to cancel subscription. Please try again.")
+    else:
+        # Manually activated subscription — no Razorpay record to cancel, just update DB
+        logger.info(f"Cancelling manual activation for google_id={device['google_id']}")
 
     await subscriptions_collection.update_one(
         {"google_id": device["google_id"]},
