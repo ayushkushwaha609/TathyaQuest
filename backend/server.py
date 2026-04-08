@@ -1171,6 +1171,15 @@ async def google_auth(body: GoogleAuthRequest):
         upsert=True,
     )
 
+    # Link any pending subscription stored by email (subscribed before first sign-in)
+    pending = await subscriptions_collection.find_one({"google_email": email, "google_id": {"$exists": False}})
+    if pending:
+        await subscriptions_collection.update_one(
+            {"_id": pending["_id"]},
+            {"$set": {"google_id": google_id}},
+        )
+        logger.info(f"Linked pending subscription to google_id={google_id} for {email}")
+
     usage = await get_device_usage(body.device_id)
     return {
         "authenticated": True,
@@ -1320,6 +1329,15 @@ async def get_subscription_status(x_device_id: Optional[str] = Header(None)):
         return {"plan": "free", "status": "none"}
 
     sub = await subscriptions_collection.find_one({"google_id": device["google_id"]})
+    # Fallback: look up by email in case subscription was stored before google_id was linked
+    if not sub and device.get("google_email"):
+        sub = await subscriptions_collection.find_one({"google_email": device["google_email"]})
+        if sub and not sub.get("google_id"):
+            # Opportunistically link it now
+            await subscriptions_collection.update_one(
+                {"_id": sub["_id"]},
+                {"$set": {"google_id": device["google_id"]}},
+            )
     if not sub:
         return {"plan": "free", "status": "none"}
 
@@ -1692,20 +1710,32 @@ async def razorpay_webhook(request: Request):
         update: dict = {"status": "active", "current_period_end": period_end, "updated_at": now}
         if google_id:
             update["google_id"] = google_id
-        # Try to update existing doc by subscription_id first; fall back to google_id
+        if email_from_notes:
+            update["google_email"] = email_from_notes
+        # Try to update existing doc by subscription_id first
         matched = await subscriptions_collection.update_one(
             {"razorpay_subscription_id": subscription_id},
             {"$set": update},
         )
-        if matched.matched_count == 0 and google_id:
-            # No doc with this subscription_id — update/upsert by google_id instead
-            update["razorpay_subscription_id"] = subscription_id
-            await subscriptions_collection.update_one(
-                {"google_id": google_id},
-                {"$set": update},
-                upsert=True,
-            )
-        logger.info(f"Subscription activated/charged: {subscription_id} google_id={google_id}")
+        if matched.matched_count == 0:
+            if google_id:
+                # Upsert by google_id
+                update["razorpay_subscription_id"] = subscription_id
+                await subscriptions_collection.update_one(
+                    {"google_id": google_id},
+                    {"$set": update},
+                    upsert=True,
+                )
+            elif email_from_notes:
+                # User hasn't signed in yet — store by email so it links on first sign-in
+                update["razorpay_subscription_id"] = subscription_id
+                await subscriptions_collection.update_one(
+                    {"google_email": email_from_notes},
+                    {"$set": update},
+                    upsert=True,
+                )
+                logger.info(f"Subscription stored by email (no google_id yet): {email_from_notes}")
+        logger.info(f"Subscription activated/charged: {subscription_id} google_id={google_id} email={email_from_notes}")
 
     elif event == "subscription.halted":
         await subscriptions_collection.update_one(
