@@ -72,6 +72,8 @@ export default function HomeScreen() {
       if (!sharedText) { resetShareIntent(); return; }
       const cleanUrl = extractUrl(sharedText);
       if (cleanUrl && /(instagram\.com|instagr\.am|youtube\.com|youtu\.be)/i.test(cleanUrl)) {
+        // Login is required — do not process the share if not authenticated
+        if (!isAuthenticated) { resetShareIntent(); return; }
         isProcessingShareRef.current = true;
         useCheckStore.setState({ result: null, error: null, isLoading: false });
         setUrl(cleanUrl);
@@ -154,68 +156,77 @@ export default function HomeScreen() {
 
             {/* Input Section */}
             <View style={styles.inputSection}>
-              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Paste Video Link</Text>
-              <View style={[styles.inputContainer, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder }]}>
-                <Ionicons name="link" size={20} color={colors.textTertiary} style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.textInput, { color: colors.textPrimary }]}
-                  placeholder="Instagram or YouTube link"
-                  placeholderTextColor={colors.textTertiary}
-                  value={url}
-                  onChangeText={setUrl}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                />
-                {url.length > 0 && (
-                  <TouchableOpacity onPress={() => setUrl('')}>
-                    <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+              {!isAuthenticated ? (
+                /* Login wall — shown to all users who are not signed in */
+                <View style={[styles.loginWall, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+                  <Ionicons name="lock-closed" size={32} color={colors.saffron} style={{ marginBottom: 12 }} />
+                  <Text style={[styles.loginWallTitle, { color: colors.textPrimary }]}>Sign in to fact-check</Text>
+                  <Text style={[styles.loginWallBody, { color: colors.textSecondary }]}>
+                    A free account gives you 3 YouTube + 3 Instagram checks per day.
+                  </Text>
+                  <View style={{ marginTop: 20, width: '100%' }}>
+                    <GoogleSignInButton />
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Paste Video Link</Text>
+                  <View style={[styles.inputContainer, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder }]}>
+                    <Ionicons name="link" size={20} color={colors.textTertiary} style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.textInput, { color: colors.textPrimary }]}
+                      placeholder="Instagram or YouTube link"
+                      placeholderTextColor={colors.textTertiary}
+                      value={url}
+                      onChangeText={setUrl}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                    />
+                    {url.length > 0 && (
+                      <TouchableOpacity onPress={() => setUrl('')}>
+                        <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {error && (
+                    <View style={styles.errorContainer}>
+                      <Ionicons name="alert-circle" size={16} color={colors.false} />
+                      <Text style={[styles.errorText, { color: colors.false }]}>{error}</Text>
+                    </View>
+                  )}
+
+                  <Text style={[styles.inputLabel, { color: colors.textPrimary, marginTop: 20 }]}>Select Language</Text>
+                  <LanguagePicker selectedValue={languageCode} onValueChange={setLanguageCode} />
+
+                  {/* Check Button */}
+                  <TouchableOpacity
+                    onPress={handleCheck}
+                    disabled={!url || isLoading || (!isExempt && checksRemaining <= 0)}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[
+                        styles.checkButton,
+                        {
+                          backgroundColor: (!url || isLoading || (!isExempt && checksRemaining <= 0))
+                            ? colors.sandstone
+                            : colors.deepIndigo as string,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.checkButtonText}>Check</Text>
+                      <Text style={[styles.checkButtonHindi, { color: colors.warmOrange }]}>जांचें</Text>
+                      <Ionicons name="arrow-forward" size={20} color="#fff" />
+                    </View>
                   </TouchableOpacity>
-                )}
-              </View>
 
-              {error && (
-                <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle" size={16} color={colors.false} />
-                  <Text style={[styles.errorText, { color: colors.false }]}>{error}</Text>
-                </View>
-              )}
-
-              <Text style={[styles.inputLabel, { color: colors.textPrimary, marginTop: 20 }]}>Select Language</Text>
-              <LanguagePicker selectedValue={languageCode} onValueChange={setLanguageCode} />
-
-              {/* Check Button */}
-              <TouchableOpacity
-                onPress={handleCheck}
-                disabled={!url || isLoading || (!isExempt && checksRemaining <= 0)}
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    styles.checkButton,
-                    {
-                      backgroundColor: (!url || isLoading || (!isExempt && checksRemaining <= 0))
-                        ? colors.sandstone
-                        : colors.deepIndigo as string,
-                    },
-                  ]}
-                >
-                  <Text style={styles.checkButtonText}>Check</Text>
-                  <Text style={[styles.checkButtonHindi, { color: colors.warmOrange }]}>जांचें</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#fff" />
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.infoContainer}>
-                <Ionicons name="information-circle" size={16} color={colors.textTertiary} />
-                <Text style={[styles.infoText, { color: colors.textTertiary }]}>Works with public reels only</Text>
-              </View>
-
-              {/* Google Sign-In — only show on main screen if not signed in */}
-              {!isAuthenticated && (
-                <View style={styles.authSection}>
-                  <GoogleSignInButton />
-                </View>
+                  <View style={styles.infoContainer}>
+                    <Ionicons name="information-circle" size={16} color={colors.textTertiary} />
+                    <Text style={[styles.infoText, { color: colors.textTertiary }]}>Works with public reels only</Text>
+                  </View>
+                </>
               )}
             </View>
 
@@ -346,26 +357,26 @@ export default function HomeScreen() {
                   TathyaQuest uses multiple AI and third-party APIs to verify claims, and each check incurs real infrastructure costs on our end.
                 </Text>
                 <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
-                  To keep the service free and accessible while we work toward a sustainable model, we've introduced daily usage limits — 10 YouTube / 3 Instagram checks without sign-in, and 15 YouTube / 5 Instagram with a Google account.
+                  A free Google account gives you 3 YouTube Shorts + 3 Instagram Reels per day. Signing in is required to use the service — this helps us prevent abuse and keep the app fast for everyone.
                 </Text>
                 <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
-                  We're actively working on a freemium plan that will offer higher limits. Your continued usage helps us understand demand and shape the right pricing.
+                  We're working on a paid plan for unlimited checks. Your support helps us cover infrastructure costs and keep growing.
                 </Text>
                 <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
-                  Thank you for supporting TathyaQuest while we grow.
+                  Thank you for using TathyaQuest!
                 </Text>
                 <View style={styles.modalDivider} />
                 <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
                   TathyaQuest दावों की जाँच के लिए कई AI और थर्ड-पार्टी APIs का उपयोग करता है, और हर जाँच पर हमें वास्तविक इंफ्रास्ट्रक्चर लागत आती है।
                 </Text>
                 <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
-                  सेवा को मुफ़्त और सबके लिए सुलभ बनाए रखने के लिए, जब तक हम एक टिकाऊ मॉडल पर काम कर रहे हैं, हमने दैनिक उपयोग सीमाएँ तय की हैं — बिना साइन-इन के 10 YouTube / 3 Instagram जाँच, और Google अकाउंट से साइन-इन करने पर 15 YouTube / 5 Instagram जाँच।
+                  एक मुफ़्त Google अकाउंट से आपको प्रतिदिन 3 YouTube Shorts + 3 Instagram Reels जाँचने की सुविधा मिलती है। सेवा का उपयोग करने के लिए साइन-इन अनिवार्य है — इससे हम दुरुपयोग रोकते हैं और सभी के लिए ऐप को तेज़ बनाए रखते हैं।
                 </Text>
                 <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
-                  हम एक फ्रीमियम प्लान पर सक्रिय रूप से काम कर रहे हैं जिसमें अधिक सीमाएँ उपलब्ध होंगी। आपका निरंतर उपयोग हमें माँग को समझने और सही मूल्य निर्धारण तय करने में मदद करता है।
+                  हम असीमित जाँच के लिए एक पेड प्लान पर काम कर रहे हैं। आपका समर्थन हमें इंफ्रास्ट्रक्चर लागत कवर करने और आगे बढ़ने में मदद करता है।
                 </Text>
                 <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
-                  TathyaQuest को बढ़ने में सहयोग देने के लिए आपका धन्यवाद!
+                  TathyaQuest का उपयोग करने के लिए आपका धन्यवाद!
                 </Text>
               </ScrollView>
               <TouchableOpacity
@@ -410,7 +421,9 @@ const styles = StyleSheet.create({
   checkButtonHindi: { fontSize: 16, fontWeight: '500' },
   infoContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, gap: 6 },
   infoText: { fontSize: 14 },
-  authSection: { marginTop: 24 },
+  loginWall: { alignItems: 'center', borderRadius: 16, borderWidth: 1, padding: 28, marginTop: 8 },
+  loginWallTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
+  loginWallBody: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 'auto', paddingTop: 16, paddingBottom: 8 },
   footerLink: { fontSize: 12, textDecorationLine: 'underline' },
   footerDot: { fontSize: 12 },

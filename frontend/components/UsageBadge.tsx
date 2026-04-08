@@ -11,8 +11,19 @@ function getBadgeColor(remaining: number, isExempt: boolean, falseColor: string)
 }
 
 export function UsageBadge() {
-  const { ytChecksRemaining, ytDailyLimit, igChecksRemaining, igDailyLimit, isExempt } = useAuthStore();
+  const { ytChecksRemaining, ytDailyLimit, igChecksRemaining, igDailyLimit, isExempt, isAuthenticated } = useAuthStore();
   const { colors } = useThemeStore();
+
+  if (!isAuthenticated) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+        <View style={styles.row}>
+          <Ionicons name="lock-closed-outline" size={14} color={colors.textTertiary} />
+          <Text style={[styles.text, { color: colors.textTertiary }]}>Sign in to start checking</Text>
+        </View>
+      </View>
+    );
+  }
 
   if (isExempt) {
     return (

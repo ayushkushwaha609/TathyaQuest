@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View, Alert, Platform } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useAuthStore } from '../store/useAuthStore';
@@ -79,7 +79,7 @@ export function GoogleSignInButton() {
         <>
           <Ionicons name="logo-google" size={18} color="#4285F4" />
           <Text style={[styles.buttonText, { color: colors.textPrimary }]}>
-            Sign in for more checks
+            Sign in with Google
           </Text>
         </>
       )}

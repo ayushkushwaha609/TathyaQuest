@@ -45,9 +45,9 @@ function parseUsageFromResponse(data: any) {
   }
   // Fallback for old flat format
   return {
-    ytDailyLimit: data.daily_limit ?? 10,
+    ytDailyLimit: data.daily_limit ?? 3,
     ytChecksUsed: data.checks_used ?? 0,
-    ytChecksRemaining: data.checks_remaining ?? 10,
+    ytChecksRemaining: data.checks_remaining ?? 3,
     igDailyLimit: data.daily_limit ?? 3,
     igChecksUsed: data.checks_used ?? 0,
     igChecksRemaining: data.checks_remaining ?? 3,
@@ -60,9 +60,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   isExempt: false,
   googleEmail: null,
   googleName: null,
-  ytDailyLimit: 10,
+  ytDailyLimit: 3,
   ytChecksUsed: 0,
-  ytChecksRemaining: 10,
+  ytChecksRemaining: 3,
   igDailyLimit: 3,
   igChecksUsed: 0,
   igChecksRemaining: 3,

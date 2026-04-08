@@ -75,11 +75,9 @@ async def verify_api_key(api_key: str = Security(api_key_header)):
 GOOGLE_CLIENT_ID_WEB = os.environ.get('GOOGLE_CLIENT_ID_WEB', '')
 GOOGLE_CLIENT_ID_ANDROID = os.environ.get('GOOGLE_CLIENT_ID_ANDROID', '')
 
-# Daily usage limits (per platform)
-DAILY_LIMIT_YT_ANON = int(os.environ.get('DAILY_LIMIT_YT_ANON', '10'))
-DAILY_LIMIT_YT_AUTH = int(os.environ.get('DAILY_LIMIT_YT_AUTH', '15'))
-DAILY_LIMIT_IG_ANON = int(os.environ.get('DAILY_LIMIT_IG_ANON', '3'))
-DAILY_LIMIT_IG_AUTH = int(os.environ.get('DAILY_LIMIT_IG_AUTH', '5'))
+# Daily usage limits — login is required; these apply to all authenticated (free) users
+DAILY_LIMIT_YT = int(os.environ.get('DAILY_LIMIT_YT', '3'))
+DAILY_LIMIT_IG = int(os.environ.get('DAILY_LIMIT_IG', '3'))
 
 # Exempt devices and emails (unlimited checks)
 _exempt_devices_env = os.environ.get('EXEMPT_DEVICE_IDS', '')
@@ -1048,8 +1046,7 @@ async def get_device_usage(device_id: str) -> dict:
     today = today_ist()
     email = (device.get("google_email") or device.get("admin_email") or "").lower() if device else ""
 
-    # For authenticated users: count by email (each account gets its own quota)
-    # For anonymous users: count by device_id
+    # Count usage by email so quota is shared across devices for the same account
     if is_auth and email:
         usage_filter = {"email": email, "date_ist": today}
     else:
@@ -1063,8 +1060,8 @@ async def get_device_usage(device_id: str) -> dict:
     if exempt:
         yt_limit = ig_limit = 999999
     else:
-        yt_limit = DAILY_LIMIT_YT_AUTH if is_auth else DAILY_LIMIT_YT_ANON
-        ig_limit = DAILY_LIMIT_IG_AUTH if is_auth else DAILY_LIMIT_IG_ANON
+        yt_limit = DAILY_LIMIT_YT
+        ig_limit = DAILY_LIMIT_IG
 
     ig_total_used = ig_used + legacy_used
 
@@ -1091,27 +1088,27 @@ async def get_device_usage(device_id: str) -> dict:
 
 # --- Verify daily limit for a specific platform ---
 async def verify_daily_limit(request: Request, platform: str):
-    """Check if device has remaining checks for the given platform ('youtube' or 'instagram')."""
+    """Check if device has remaining checks for the given platform ('youtube' or 'instagram').
+    Rejects unauthenticated requests — login is required to use the service.
+    """
     device_id = request.headers.get("X-Device-Id")
     if not device_id:
         raise HTTPException(status_code=400, detail={"error": "missing_device_id", "message": "Device ID is required."})
 
-    # Ensure device exists
-    await devices_collection.update_one(
-        {"device_id": device_id},
-        {"$setOnInsert": {"device_id": device_id, "google_id": None, "google_email": None, "google_name": None, "created_at": datetime.now(timezone.utc).isoformat()}},
-        upsert=True,
-    )
+    # Login is required — reject anonymous devices
+    device = await devices_collection.find_one({"device_id": device_id})
+    is_auth = bool(device and (device.get("google_id") or device.get("admin_email")))
+    if not is_auth:
+        raise HTTPException(status_code=401, detail={"error": "auth_required", "message": "Sign in with Google to use TathyaQuest."})
 
     usage = await get_device_usage(device_id)
     platform_usage = usage.get(platform, usage.get("instagram"))
 
     if platform_usage["checks_remaining"] <= 0:
         platform_label = "YouTube" if platform == "youtube" else "Instagram"
-        msg = f"{platform_label} daily limit reached. Sign in with Google for more checks!" if not usage["is_authenticated"] else f"{platform_label} daily limit reached. Come back tomorrow!"
         raise HTTPException(status_code=429, detail={
             "error": "daily_limit_reached",
-            "message": msg,
+            "message": f"{platform_label} daily limit reached. Come back tomorrow!",
             "daily_limit": platform_usage["daily_limit"],
             "checks_used": platform_usage["checks_used"],
             "platform": platform,
@@ -1433,20 +1430,18 @@ async def check_claim(request: Request, body: CheckRequest):
 
 @api_router.get("/history")
 async def get_history(request: Request, _: str = Depends(verify_api_key)):
-    """Return the last 50 checks for this device/account."""
+    """Return the last 50 checks for this account. Login required."""
     device_id = request.headers.get("X-Device-Id", "")
     if not device_id:
         raise HTTPException(status_code=400, detail="Missing X-Device-Id header")
 
     device = await devices_collection.find_one({"device_id": device_id})
     is_auth = bool(device and (device.get("google_id") or device.get("admin_email")))
-    email = (device.get("google_email") or device.get("admin_email") or "").lower() if device else ""
+    if not is_auth:
+        raise HTTPException(status_code=401, detail={"error": "auth_required", "message": "Sign in to view history."})
 
-    # For authenticated users query by email, for anon by device_id
-    if is_auth and email:
-        query = {"email": email, "claim": {"$exists": True, "$ne": ""}}
-    else:
-        query = {"device_id": device_id, "claim": {"$exists": True, "$ne": ""}}
+    email = (device.get("google_email") or device.get("admin_email") or "").lower()
+    query = {"email": email, "claim": {"$exists": True, "$ne": ""}}
 
     cursor = usage_collection.find(query, {"_id": 0, "url_checked": 1, "platform": 1, "timestamp": 1, "claim": 1, "verdict": 1, "confidence": 1}).sort("timestamp", -1).limit(50)
     items = await cursor.to_list(length=50)
