@@ -53,7 +53,8 @@ export default function HomeScreen() {
     error,
     runCheck,
   } = useCheckStore();
-  const { ytChecksRemaining, igChecksRemaining, isExempt, isAuthenticated, googleEmail, fetchUsage } = useAuthStore();
+  const { ytChecksRemaining, igChecksRemaining, isExempt, isAuthenticated, googleEmail, fetchUsage, subscriptionPlan } = useAuthStore();
+  const { limitReached } = useCheckStore();
 
   const isYouTubeUrl = /(youtube\.com|youtu\.be)/i.test(url);
   const checksRemaining = isYouTubeUrl ? ytChecksRemaining : igChecksRemaining;
@@ -286,9 +287,16 @@ export default function HomeScreen() {
                         <Ionicons name="person" size={18} color="#fff" />
                       </View>
                       <View style={styles.drawerAccountInfo}>
-                        <Text style={[styles.drawerEmail, { color: colors.textPrimary }]} numberOfLines={1}>
-                          {googleEmail}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.drawerEmail, { color: colors.textPrimary, flex: 1 }]} numberOfLines={1}>
+                            {googleEmail}
+                          </Text>
+                          {subscriptionPlan === 'pro' && (
+                            <View style={[styles.proBadge, { backgroundColor: colors.saffron }]}>
+                              <Text style={styles.proBadgeText}>PRO</Text>
+                            </View>
+                          )}
+                        </View>
                         <Text style={[styles.drawerLabel, { color: colors.textTertiary }]}>Signed in</Text>
                       </View>
                     </View>
@@ -304,6 +312,16 @@ export default function HomeScreen() {
                   >
                     <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
                     <Text style={[styles.drawerMenuText, { color: colors.textPrimary }]}>My History</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.drawerMenuItem}
+                    onPress={() => { closeDrawer(); router.push('/account'); }}
+                  >
+                    <Ionicons name="flash-outline" size={20} color={colors.saffron} />
+                    <Text style={[styles.drawerMenuText, { color: colors.textPrimary }]}>
+                      {subscriptionPlan === 'pro' ? 'My Plan' : 'Upgrade to Pro'}
+                    </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -333,6 +351,45 @@ export default function HomeScreen() {
               </SafeAreaView>
             </Animated.View>
           </View>
+        </Modal>
+
+        {/* Upgrade Modal — fires when daily limit is hit */}
+        <Modal
+          visible={limitReached}
+          transparent
+          animationType="fade"
+          onRequestClose={() => useCheckStore.setState({ limitReached: false })}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => useCheckStore.setState({ limitReached: false })}
+          >
+            <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <View style={styles.modalHeader}>
+                <Ionicons name="flash" size={24} color={colors.saffron} />
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Daily Limit Reached</Text>
+              </View>
+              <Text style={[styles.modalBody, { color: colors.textSecondary }]}>
+                You've used all your free checks for today. Upgrade to Pro for unlimited YouTube Shorts and Instagram Reels — every day.
+              </Text>
+              <TouchableOpacity
+                style={[styles.modalClose, { backgroundColor: colors.saffron }]}
+                onPress={() => {
+                  useCheckStore.setState({ limitReached: false });
+                  router.push('/pricing');
+                }}
+              >
+                <Text style={styles.modalCloseText}>Upgrade to Pro — ₹99/month</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ alignItems: 'center', marginTop: 12 }}
+                onPress={() => useCheckStore.setState({ limitReached: false })}
+              >
+                <Text style={[styles.modalBody, { color: colors.textTertiary, marginBottom: 0 }]}>Maybe later</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         </Modal>
 
         {/* Disclaimer Modal */}
@@ -421,6 +478,8 @@ const styles = StyleSheet.create({
   checkButtonHindi: { fontSize: 16, fontWeight: '500' },
   infoContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, gap: 6 },
   infoText: { fontSize: 14 },
+  proBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  proBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
   loginWall: { alignItems: 'center', borderRadius: 16, borderWidth: 1, padding: 28, marginTop: 8 },
   loginWallTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
   loginWallBody: { fontSize: 14, lineHeight: 20, textAlign: 'center' },

@@ -43,6 +43,7 @@ interface CheckStore {
   isLoading: boolean;
   result: CheckResult | null;
   error: string | null;
+  limitReached: boolean;
   setUrl: (url: string) => void;
   setLanguageCode: (code: string) => void;
   runCheck: (urlOverride?: string) => Promise<boolean>;
@@ -55,6 +56,7 @@ export const useCheckStore = create<CheckStore>((set, get) => ({
   isLoading: false,
   result: null,
   error: null,
+  limitReached: false,
 
   setUrl: (url: string) => set({ url, error: null }),
   
@@ -85,10 +87,7 @@ export const useCheckStore = create<CheckStore>((set, get) => ({
 
     if (!authState.isExempt && checksRemaining <= 0) {
       isRequestInFlight = false;
-      const msg = authState.isAuthenticated
-        ? `${platformLabel} daily limit reached. Come back tomorrow!`
-        : `${platformLabel} daily limit reached. Sign in with Google for more checks!`;
-      set({ error: msg });
+      set({ error: `${platformLabel} daily limit reached.`, limitReached: true });
       return false;
     }
 
@@ -125,6 +124,11 @@ export const useCheckStore = create<CheckStore>((set, get) => ({
 
       let errorMessage = 'Something went wrong. Please try again.';
 
+      if (error.response?.status === 429) {
+        set({ error: null, limitReached: true, isLoading: false });
+        return false;
+      }
+
       if (error.response?.data?.detail) {
         const detail = error.response.data.detail;
         if (typeof detail === 'object') {
@@ -144,9 +148,8 @@ export const useCheckStore = create<CheckStore>((set, get) => ({
   },
 
   reset: () => {
-    // Invalidate any in-flight request so its response is ignored
     latestRequestId++;
     isRequestInFlight = false;
-    set({ url: '', result: null, error: null, isLoading: false });
+    set({ url: '', result: null, error: null, isLoading: false, limitReached: false });
   },
 }));

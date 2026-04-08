@@ -23,12 +23,19 @@ interface AuthStore {
   igChecksUsed: number;
   igChecksRemaining: number;
   isAuthLoading: boolean;
+  // Subscription
+  subscriptionPlan: 'free' | 'pro';
+  subscriptionStatus: string;
+  subscriptionEndDate: string | null;
+  subscriptionId: string | null;
 
   initDevice: () => Promise<void>;
   fetchUsage: () => Promise<void>;
+  fetchSubscription: () => Promise<void>;
   signInWithGoogle: (idToken: string) => Promise<boolean>;
   signInWithAdmin: (email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
+  cancelSubscription: () => Promise<{ success: boolean; message: string }>;
 }
 
 function parseUsageFromResponse(data: any) {
@@ -67,6 +74,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   igChecksUsed: 0,
   igChecksRemaining: 3,
   isAuthLoading: false,
+  subscriptionPlan: 'free',
+  subscriptionStatus: 'none',
+  subscriptionEndDate: null,
+  subscriptionId: null,
 
   initDevice: async () => {
     const deviceId = await getDeviceId();
@@ -115,6 +126,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         googleEmail: data.email,
         googleName: data.name,
       }));
+
+      // Refresh subscription status alongside usage
+      if (data.is_authenticated) await get().fetchSubscription();
     } catch (e) {
       // Silently fail — usage will show defaults
     }
@@ -192,6 +206,46 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch {
       set({ isAuthLoading: false });
       return false;
+    }
+  },
+
+  fetchSubscription: async () => {
+    const { deviceId } = get();
+    if (!deviceId) return;
+    try {
+      const response = await axios.get(`${API_URL}/api/subscription/status`, {
+        headers: {
+          'X-Device-Id': deviceId,
+          ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
+        },
+      });
+      const data = response.data;
+      set({
+        subscriptionPlan: data.plan ?? 'free',
+        subscriptionStatus: data.status ?? 'none',
+        subscriptionEndDate: data.current_period_end ?? null,
+        subscriptionId: data.subscription_id ?? null,
+      });
+    } catch {
+      // silently fail — defaults stay as free
+    }
+  },
+
+  cancelSubscription: async () => {
+    const { deviceId } = get();
+    if (!deviceId) return { success: false, message: 'No device ID' };
+    try {
+      const response = await axios.post(`${API_URL}/api/subscription/cancel`, {}, {
+        headers: {
+          'X-Device-Id': deviceId,
+          ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
+        },
+      });
+      set({ subscriptionPlan: 'free', subscriptionStatus: 'cancelled' });
+      return { success: true, message: response.data.message };
+    } catch (e: any) {
+      const msg = e.response?.data?.detail?.message || 'Failed to cancel subscription.';
+      return { success: false, message: msg };
     }
   },
 

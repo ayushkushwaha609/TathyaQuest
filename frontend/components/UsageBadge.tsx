@@ -11,7 +11,7 @@ function getBadgeColor(remaining: number, isExempt: boolean, falseColor: string)
 }
 
 export function UsageBadge() {
-  const { ytChecksRemaining, ytDailyLimit, igChecksRemaining, igDailyLimit, isExempt, isAuthenticated } = useAuthStore();
+  const { ytChecksRemaining, ytDailyLimit, igChecksRemaining, igDailyLimit, isExempt, isAuthenticated, subscriptionPlan } = useAuthStore();
   const { colors } = useThemeStore();
 
   if (!isAuthenticated) {
@@ -25,12 +25,14 @@ export function UsageBadge() {
     );
   }
 
-  if (isExempt) {
+  if (isExempt || subscriptionPlan === 'pro') {
     return (
       <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
         <View style={styles.row}>
-          <Ionicons name="shield-checkmark" size={16} color="#4CAF50" />
-          <Text style={[styles.text, { color: colors.textPrimary }]}>Unlimited checks</Text>
+          <Ionicons name={subscriptionPlan === 'pro' ? 'flash' : 'shield-checkmark'} size={16} color="#4CAF50" />
+          <Text style={[styles.text, { color: colors.textPrimary }]}>
+            {subscriptionPlan === 'pro' ? 'Pro · Unlimited checks' : 'Unlimited checks'}
+          </Text>
         </View>
       </View>
     );

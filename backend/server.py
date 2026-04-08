@@ -9,10 +9,12 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import Optional
 import hashlib
+import hmac as hmac_lib
 import tempfile
 import json
 import re
 import httpx
+import razorpay
 from groq import Groq
 from duckduckgo_search import DDGS
 from urllib.parse import quote as url_quote, urlparse
@@ -85,6 +87,13 @@ EXEMPT_DEVICE_IDS = {d.strip() for d in _exempt_devices_env.split(',') if d.stri
 _exempt_emails_env = os.environ.get('EXEMPT_EMAILS', '')
 EXEMPT_EMAILS = {e.strip().lower() for e in _exempt_emails_env.split(',') if e.strip()}
 
+# Razorpay config
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
+RAZORPAY_PLAN_ID = os.environ.get('RAZORPAY_PLAN_ID', '')
+RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')
+rzp_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)) if RAZORPAY_KEY_ID else None
+
 # Admin account (manual email/password login)
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
@@ -120,6 +129,7 @@ api_router = APIRouter(prefix="/api")
 checks_collection = db["checks"]
 devices_collection = db["devices"]
 usage_collection = db["usage_log"]
+subscriptions_collection = db["subscriptions"]
 
 # Configure logging
 logging.basicConfig(
@@ -1101,6 +1111,13 @@ async def verify_daily_limit(request: Request, platform: str):
     if not is_auth:
         raise HTTPException(status_code=401, detail={"error": "auth_required", "message": "Sign in with Google to use TathyaQuest."})
 
+    # Pro subscribers bypass daily limits entirely
+    google_id = device.get("google_id") if device else None
+    if google_id:
+        sub = await subscriptions_collection.find_one({"google_id": google_id, "status": "active"})
+        if sub:
+            return  # unlimited access
+
     usage = await get_device_usage(device_id)
     platform_usage = usage.get(platform, usage.get("instagram"))
 
@@ -1211,6 +1228,138 @@ async def logout(body: dict):
 
     usage = await get_device_usage(device_id)
     return {"authenticated": False, **usage}
+
+# --- Subscription endpoints ---
+
+@api_router.post("/subscription/create", dependencies=[Depends(verify_api_key)])
+async def create_subscription(request: Request):
+    """Create a Razorpay subscription for the authenticated user."""
+    if not rzp_client or not RAZORPAY_PLAN_ID:
+        raise HTTPException(status_code=503, detail="Payment system not configured")
+
+    # Identify user — supports device_id (from app) or google id_token (from website)
+    device_id = request.headers.get("X-Device-Id")
+    body = await request.json()
+    google_id, email, name = None, "", ""
+
+    if device_id:
+        device = await devices_collection.find_one({"device_id": device_id})
+        if not device or not device.get("google_id"):
+            raise HTTPException(status_code=401, detail={"error": "auth_required", "message": "Sign in with Google to subscribe."})
+        google_id = device["google_id"]
+        email = device.get("google_email", "")
+        name = device.get("google_name", "")
+    elif body.get("id_token"):
+        # Web checkout: verify Google token directly
+        try:
+            idinfo = google_id_token.verify_oauth2_token(
+                body["id_token"], google_requests.Request(), audience=GOOGLE_CLIENT_ID_WEB
+            )
+            if idinfo.get("aud") not in (GOOGLE_CLIENT_ID_WEB, GOOGLE_CLIENT_ID_ANDROID):
+                raise ValueError("Invalid audience")
+        except Exception as e:
+            logger.error(f"Google token verification failed for web subscription: {e}")
+            raise HTTPException(status_code=401, detail="Invalid Google token")
+        google_id = idinfo["sub"]
+        email = idinfo.get("email", "")
+        name = idinfo.get("name", "")
+    else:
+        raise HTTPException(status_code=400, detail="Provide X-Device-Id header or id_token in body")
+
+    # Return existing active subscription if user is already subscribed
+    existing = await subscriptions_collection.find_one({"google_id": google_id, "status": "active"})
+    if existing:
+        return {
+            "already_subscribed": True,
+            "subscription_id": existing["razorpay_subscription_id"],
+            "short_url": existing.get("short_url", ""),
+        }
+
+    try:
+        sub = rzp_client.subscription.create({
+            "plan_id": RAZORPAY_PLAN_ID,
+            "total_count": 120,
+            "quantity": 1,
+            "customer_notify": 1,
+            "notes": {"google_id": google_id, "email": email},
+        })
+    except Exception as e:
+        logger.error(f"Razorpay subscription creation failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create subscription. Please try again.")
+
+    await subscriptions_collection.update_one(
+        {"google_id": google_id},
+        {"$set": {
+            "google_id": google_id,
+            "google_email": email,
+            "razorpay_subscription_id": sub["id"],
+            "plan_id": RAZORPAY_PLAN_ID,
+            "status": "created",
+            "short_url": sub.get("short_url", ""),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+
+    return {
+        "already_subscribed": False,
+        "subscription_id": sub["id"],
+        "short_url": sub.get("short_url", ""),
+    }
+
+
+@api_router.get("/subscription/status", dependencies=[Depends(verify_api_key)])
+async def get_subscription_status(x_device_id: Optional[str] = Header(None)):
+    """Return subscription tier for the device's linked Google account."""
+    if not x_device_id:
+        return {"plan": "free", "status": "none"}
+
+    device = await devices_collection.find_one({"device_id": x_device_id})
+    if not device or not device.get("google_id"):
+        return {"plan": "free", "status": "none"}
+
+    sub = await subscriptions_collection.find_one({"google_id": device["google_id"]})
+    if not sub:
+        return {"plan": "free", "status": "none"}
+
+    return {
+        "plan": "pro" if sub["status"] == "active" else "free",
+        "status": sub["status"],
+        "subscription_id": sub.get("razorpay_subscription_id"),
+        "current_period_end": sub.get("current_period_end"),
+    }
+
+
+@api_router.post("/subscription/cancel", dependencies=[Depends(verify_api_key)])
+async def cancel_subscription(request: Request):
+    """Cancel the active subscription at end of current billing period."""
+    device_id = request.headers.get("X-Device-Id")
+    if not device_id:
+        raise HTTPException(status_code=400, detail="Missing X-Device-Id header")
+
+    device = await devices_collection.find_one({"device_id": device_id})
+    if not device or not device.get("google_id"):
+        raise HTTPException(status_code=401, detail={"error": "auth_required", "message": "Not authenticated."})
+
+    sub = await subscriptions_collection.find_one({"google_id": device["google_id"], "status": "active"})
+    if not sub:
+        raise HTTPException(status_code=404, detail={"error": "no_subscription", "message": "No active subscription found."})
+
+    try:
+        # cancel_at_cycle_end=1 means access continues until period end
+        rzp_client.subscription.cancel(sub["razorpay_subscription_id"], {"cancel_at_cycle_end": 1})
+    except Exception as e:
+        logger.error(f"Razorpay cancellation failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to cancel subscription. Please try again.")
+
+    await subscriptions_collection.update_one(
+        {"google_id": device["google_id"]},
+        {"$set": {"status": "cancelled", "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+
+    return {"success": True, "message": "Subscription cancelled. Access continues until end of billing period."}
+
 
 @api_router.get("/usage")
 async def get_usage(x_device_id: Optional[str] = Header(None)):
@@ -1448,6 +1597,75 @@ async def get_history(request: Request, _: str = Depends(verify_api_key)):
     return {"history": items}
 
 
+# --- Razorpay webhook (registered on main app to access raw request body) ---
+@app.post("/api/webhooks/razorpay")
+async def razorpay_webhook(request: Request):
+    """Handle Razorpay subscription lifecycle events.
+    Verifies HMAC-SHA256 signature before processing any event.
+    """
+    body = await request.body()
+    signature = request.headers.get("X-Razorpay-Signature", "")
+
+    if not RAZORPAY_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Webhook secret not configured")
+
+    # Constant-time HMAC verification — prevents timing attacks
+    expected = hmac_lib.new(
+        RAZORPAY_WEBHOOK_SECRET.encode("utf-8"),
+        body,
+        "sha256",
+    ).hexdigest()
+    if not hmac_lib.compare_digest(expected, signature):
+        logger.warning("Razorpay webhook: invalid signature rejected")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    try:
+        payload = json.loads(body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    event = payload.get("event", "")
+    entity = payload.get("payload", {}).get("subscription", {}).get("entity", {})
+    subscription_id = entity.get("id")
+    notes = entity.get("notes", {})
+    google_id = notes.get("google_id") if isinstance(notes, dict) else None
+
+    if not subscription_id:
+        return {"status": "ok"}
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    if event in ("subscription.activated", "subscription.charged"):
+        current_end = entity.get("current_end")
+        period_end = datetime.fromtimestamp(current_end, tz=timezone.utc).isoformat() if current_end else None
+        update: dict = {"status": "active", "current_period_end": period_end, "updated_at": now}
+        if google_id:
+            update["google_id"] = google_id
+        await subscriptions_collection.update_one(
+            {"razorpay_subscription_id": subscription_id},
+            {"$set": update},
+            upsert=True,
+        )
+        logger.info(f"Subscription activated/charged: {subscription_id} google_id={google_id}")
+
+    elif event == "subscription.halted":
+        await subscriptions_collection.update_one(
+            {"razorpay_subscription_id": subscription_id},
+            {"$set": {"status": "halted", "updated_at": now}},
+        )
+        logger.info(f"Subscription halted (payment failure): {subscription_id}")
+
+    elif event in ("subscription.cancelled", "subscription.expired", "subscription.completed"):
+        new_status = "cancelled" if event == "subscription.cancelled" else "expired"
+        await subscriptions_collection.update_one(
+            {"razorpay_subscription_id": subscription_id},
+            {"$set": {"status": new_status, "updated_at": now}},
+        )
+        logger.info(f"Subscription ended ({event}): {subscription_id}")
+
+    return {"status": "ok"}
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
@@ -1465,6 +1683,8 @@ async def startup_db():
     await devices_collection.create_index("device_id", unique=True)
     await devices_collection.create_index("google_id", sparse=True)
     await usage_collection.create_index([("device_id", 1), ("date_ist", 1), ("platform", 1)])
+    await subscriptions_collection.create_index("google_id", unique=True, sparse=True)
+    await subscriptions_collection.create_index("razorpay_subscription_id", sparse=True)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
