@@ -1597,6 +1597,48 @@ async def get_history(request: Request, _: str = Depends(verify_api_key)):
     return {"history": items}
 
 
+# --- Admin: manually activate subscription for a Google account ---
+@api_router.post("/admin/activate-subscription", dependencies=[Depends(verify_api_key)])
+async def admin_activate_subscription(request: Request):
+    """Manually activate a subscription for a given email.
+    Protected by admin password + API key. Use only for payment support cases.
+    """
+    body = await request.json()
+    admin_password = body.get("admin_password", "")
+    email = (body.get("email") or "").strip().lower()
+    razorpay_subscription_id = (body.get("razorpay_subscription_id") or "").strip()
+
+    if not ADMIN_PASSWORD or admin_password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=403, detail="Invalid admin password")
+    if not email:
+        raise HTTPException(status_code=400, detail="email is required")
+
+    # Find google_id from devices collection
+    device = await devices_collection.find_one({"google_email": email})
+    if not device or not device.get("google_id"):
+        raise HTTPException(status_code=404, detail=f"No authenticated device found for {email}")
+
+    google_id = device["google_id"]
+    now = datetime.now(timezone.utc).isoformat()
+
+    await subscriptions_collection.update_one(
+        {"google_id": google_id},
+        {"$set": {
+            "google_id": google_id,
+            "google_email": email,
+            "razorpay_subscription_id": razorpay_subscription_id or "manual_activation",
+            "plan_id": RAZORPAY_PLAN_ID,
+            "status": "active",
+            "current_period_end": None,
+            "created_at": now,
+            "updated_at": now,
+        }},
+        upsert=True,
+    )
+    logger.info(f"Admin manually activated subscription for {email} (google_id={google_id})")
+    return {"success": True, "message": f"Subscription activated for {email}", "google_id": google_id}
+
+
 # --- Razorpay webhook (registered on main app to access raw request body) ---
 @app.post("/api/webhooks/razorpay")
 async def razorpay_webhook(request: Request):
