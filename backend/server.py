@@ -1731,13 +1731,19 @@ async def razorpay_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
 
     event = payload.get("event", "")
-    entity = payload.get("payload", {}).get("subscription", {}).get("entity", {})
-    subscription_id = entity.get("id")
-    notes = entity.get("notes", {})
+
+    # Extract subscription entity — present in subscription.* events
+    sub_entity = payload.get("payload", {}).get("subscription", {}).get("entity", {})
+    # Extract payment entity — present in payment.* events (has subscription_id field)
+    pay_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+
+    # Prefer subscription entity; fall back to payment entity for subscription context
+    subscription_id = sub_entity.get("id") or pay_entity.get("subscription_id")
+    notes = sub_entity.get("notes") or pay_entity.get("notes") or {}
     google_id = notes.get("google_id") if isinstance(notes, dict) else None
     email_from_notes = (notes.get("email") or "").strip().lower() if isinstance(notes, dict) else ""
 
-    logger.info(f"Razorpay webhook event={event!r} subscription_id={subscription_id!r} google_id={google_id!r} email={email_from_notes!r}")
+    logger.info(f"Razorpay webhook event={event!r} subscription_id={subscription_id!r} google_id={google_id!r} email={email_from_notes!r} has_sub_entity={bool(sub_entity)} has_pay_entity={bool(pay_entity)}")
 
     if not subscription_id:
         logger.warning(f"Razorpay webhook: no subscription_id found in payload for event={event!r}")
@@ -1753,8 +1759,9 @@ async def razorpay_webhook(request: Request):
 
     now = datetime.now(timezone.utc).isoformat()
 
-    if event in ("subscription.activated", "subscription.charged", "subscription.authenticated"):
-        current_end = entity.get("current_end")
+    if event in ("subscription.activated", "subscription.charged", "subscription.authenticated",
+                  "payment.authorized", "payment.captured"):
+        current_end = sub_entity.get("current_end") or pay_entity.get("current_end")
         period_end = datetime.fromtimestamp(current_end, tz=timezone.utc).isoformat() if current_end else None
         update: dict = {"status": "active", "current_period_end": period_end, "updated_at": now}
         if google_id:
