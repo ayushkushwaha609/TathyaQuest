@@ -380,7 +380,7 @@ export default function HomeScreen() {
                   router.push('/pricing');
                 }}
               >
-                <Text style={styles.modalCloseText}>Upgrade to Pro — ₹99/month</Text>
+                <Text style={styles.modalCloseText}>Upgrade to Pro — ₹59/month</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ alignItems: 'center', marginTop: 12 }}

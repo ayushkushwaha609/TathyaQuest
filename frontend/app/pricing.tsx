@@ -157,7 +157,7 @@ export default function PricingScreen() {
                   <Text style={styles.popularText}>BEST VALUE</Text>
                 </View>
               </View>
-              <Text style={styles.cardPricePro}>₹99</Text>
+              <Text style={styles.cardPricePro}>₹59</Text>
               <Text style={styles.cardPriceSubPro}>per month</Text>
               <View style={[styles.divider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
               {FEATURES_PRO.map((f) => (
@@ -187,7 +187,7 @@ export default function PricingScreen() {
               ) : (
                 <>
                   <Ionicons name="flash" size={20} color="#fff" />
-                  <Text style={styles.ctaBtnText}>Get Pro — ₹99/month</Text>
+                  <Text style={styles.ctaBtnText}>Get Pro — ₹59/month</Text>
                 </>
               )}
             </TouchableOpacity>

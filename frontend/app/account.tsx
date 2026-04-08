@@ -147,7 +147,7 @@ export default function AccountScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="flash" size={18} color="#fff" />
-              <Text style={styles.upgradeBtnText}>Upgrade to Pro — ₹99/month</Text>
+              <Text style={styles.upgradeBtnText}>Upgrade to Pro — ₹59/month</Text>
             </TouchableOpacity>
           )}
 
