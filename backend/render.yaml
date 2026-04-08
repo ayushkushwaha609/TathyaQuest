@@ -24,3 +24,5 @@ services:
         sync: false
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
+      - key: SERPER_API_KEY
+        sync: false

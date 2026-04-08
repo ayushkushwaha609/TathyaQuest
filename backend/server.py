@@ -94,6 +94,8 @@ RAZORPAY_PLAN_ID = os.environ.get('RAZORPAY_PLAN_ID', '')
 RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')
 rzp_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)) if RAZORPAY_KEY_ID else None
 
+SERPER_API_KEY = os.environ.get('SERPER_API_KEY', '')
+
 # Admin account (manual email/password login)
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
@@ -570,10 +572,44 @@ async def extract_search_queries(transcript: str) -> list[str]:
         logger.warning(f"Failed to extract search queries: {e}")
         return []
 
-async def web_search(query: str, timeout: float = 8.0) -> str:
-    """Search the web using DuckDuckGo for fact-checking context"""
+async def web_search(query: str, timeout: float = 6.0) -> str:
+    """Search the web for fact-checking context.
+    Uses Serper.dev (async HTTP) if API key is set, falls back to DuckDuckGo.
+    """
     if not query:
         return ""
+
+    # --- Serper.dev (preferred: native async, reliable) ---
+    if SERPER_API_KEY:
+        try:
+            client = await get_http_client()
+            response = await asyncio.wait_for(
+                client.post(
+                    "https://google.serper.dev/search",
+                    headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
+                    json={"q": query, "num": 5, "gl": "in", "hl": "en"},
+                ),
+                timeout=timeout,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                snippets = []
+                for r in data.get("organic", []):
+                    title = r.get("title", "")
+                    snippet = r.get("snippet", "")
+                    link = r.get("link", "")
+                    snippets.append(f"- {title}: {snippet} (Source: {link})")
+                if snippets:
+                    return "\n".join(snippets)
+                logger.warning(f"Serper returned no results for: {query}")
+            else:
+                logger.warning(f"Serper error {response.status_code} for: {query}")
+        except asyncio.TimeoutError:
+            logger.warning(f"Serper search timed out after {timeout}s for: {query}")
+        except Exception as e:
+            logger.warning(f"Serper search failed: {e}")
+
+    # --- DuckDuckGo fallback ---
     try:
         def _sync_search():
             with DDGS() as ddgs:
