@@ -1730,7 +1730,10 @@ async def razorpay_webhook(request: Request):
     google_id = notes.get("google_id") if isinstance(notes, dict) else None
     email_from_notes = (notes.get("email") or "").strip().lower() if isinstance(notes, dict) else ""
 
+    logger.info(f"Razorpay webhook event={event!r} subscription_id={subscription_id!r} google_id={google_id!r} email={email_from_notes!r}")
+
     if not subscription_id:
+        logger.warning(f"Razorpay webhook: no subscription_id found in payload for event={event!r}")
         return {"status": "ok"}
 
     # If google_id is missing from notes (e.g. manually created subscription),
@@ -1743,7 +1746,7 @@ async def razorpay_webhook(request: Request):
 
     now = datetime.now(timezone.utc).isoformat()
 
-    if event in ("subscription.activated", "subscription.charged"):
+    if event in ("subscription.activated", "subscription.charged", "subscription.authenticated"):
         current_end = entity.get("current_end")
         period_end = datetime.fromtimestamp(current_end, tz=timezone.utc).isoformat() if current_end else None
         update: dict = {"status": "active", "current_period_end": period_end, "updated_at": now}
@@ -1756,25 +1759,28 @@ async def razorpay_webhook(request: Request):
             {"razorpay_subscription_id": subscription_id},
             {"$set": update},
         )
-        if matched.matched_count == 0:
+        if matched.matched_count > 0:
+            logger.info(f"Webhook: updated existing doc by subscription_id={subscription_id}")
+        else:
             if google_id:
-                # Upsert by google_id
                 update["razorpay_subscription_id"] = subscription_id
-                await subscriptions_collection.update_one(
+                result = await subscriptions_collection.update_one(
                     {"google_id": google_id},
                     {"$set": update},
                     upsert=True,
                 )
+                logger.info(f"Webhook: upserted by google_id={google_id} matched={result.matched_count} upserted={result.upserted_id}")
             elif email_from_notes:
-                # User hasn't signed in yet — store by email so it links on first sign-in
                 update["razorpay_subscription_id"] = subscription_id
-                await subscriptions_collection.update_one(
+                result = await subscriptions_collection.update_one(
                     {"google_email": email_from_notes},
                     {"$set": update},
                     upsert=True,
                 )
-                logger.info(f"Subscription stored by email (no google_id yet): {email_from_notes}")
-        logger.info(f"Subscription activated/charged: {subscription_id} google_id={google_id} email={email_from_notes}")
+                logger.info(f"Webhook: upserted by email={email_from_notes} matched={result.matched_count} upserted={result.upserted_id}")
+            else:
+                logger.error(f"Webhook: cannot link subscription {subscription_id} — no google_id or email in notes")
+        logger.info(f"Webhook processed: event={event} sub={subscription_id} status=active")
 
     elif event == "subscription.halted":
         await subscriptions_collection.update_one(
