@@ -84,18 +84,25 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     set({ deviceId });
 
     // Restore persisted auth state
+    let restoredAuthenticated = false;
     try {
       const saved = await AsyncStorage.getItem(AUTH_STATE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+        restoredAuthenticated = parsed.isAuthenticated || false;
         set({
-          isAuthenticated: parsed.isAuthenticated || false,
+          isAuthenticated: restoredAuthenticated,
           isExempt: parsed.isExempt || false,
           googleEmail: parsed.googleEmail || null,
           googleName: parsed.googleName || null,
         });
       }
     } catch {}
+
+    // Always fetch live subscription state on startup if authenticated
+    if (restoredAuthenticated) {
+      await get().fetchSubscription();
+    }
   },
 
   fetchUsage: async () => {
@@ -163,6 +170,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         googleEmail: data.email,
         googleName: data.name,
       }));
+
+      // Fetch subscription immediately after sign-in
+      await get().fetchSubscription();
 
       return true;
     } catch {

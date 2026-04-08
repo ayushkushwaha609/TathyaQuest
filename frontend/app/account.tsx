@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, Alert,
@@ -30,6 +30,9 @@ export default function AccountScreen() {
   } = useAuthStore();
 
   const [cancelling, setCancelling] = useState(false);
+
+  // Always fetch live subscription state when this screen opens
+  useEffect(() => { fetchSubscription(); }, []);
 
   const isPro = subscriptionPlan === 'pro';
 
