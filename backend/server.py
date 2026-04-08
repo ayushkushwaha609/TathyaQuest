@@ -1671,9 +1671,18 @@ async def razorpay_webhook(request: Request):
     subscription_id = entity.get("id")
     notes = entity.get("notes", {})
     google_id = notes.get("google_id") if isinstance(notes, dict) else None
+    email_from_notes = (notes.get("email") or "").strip().lower() if isinstance(notes, dict) else ""
 
     if not subscription_id:
         return {"status": "ok"}
+
+    # If google_id is missing from notes (e.g. manually created subscription),
+    # fall back to email lookup in devices collection
+    if not google_id and email_from_notes:
+        device = await devices_collection.find_one({"google_email": email_from_notes})
+        if device and device.get("google_id"):
+            google_id = device["google_id"]
+            logger.info(f"Webhook: resolved google_id via email fallback for {email_from_notes}")
 
     now = datetime.now(timezone.utc).isoformat()
 
@@ -1683,11 +1692,19 @@ async def razorpay_webhook(request: Request):
         update: dict = {"status": "active", "current_period_end": period_end, "updated_at": now}
         if google_id:
             update["google_id"] = google_id
-        await subscriptions_collection.update_one(
+        # Try to update existing doc by subscription_id first; fall back to google_id
+        matched = await subscriptions_collection.update_one(
             {"razorpay_subscription_id": subscription_id},
             {"$set": update},
-            upsert=True,
         )
+        if matched.matched_count == 0 and google_id:
+            # No doc with this subscription_id — update/upsert by google_id instead
+            update["razorpay_subscription_id"] = subscription_id
+            await subscriptions_collection.update_one(
+                {"google_id": google_id},
+                {"$set": update},
+                upsert=True,
+            )
         logger.info(f"Subscription activated/charged: {subscription_id} google_id={google_id}")
 
     elif event == "subscription.halted":
