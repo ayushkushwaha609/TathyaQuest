@@ -85,7 +85,7 @@ export const useCheckStore = create<CheckStore>((set, get) => ({
     const checksRemaining = isYouTube ? authState.ytChecksRemaining : authState.igChecksRemaining;
     const platformLabel = isYouTube ? 'YouTube' : 'Instagram';
 
-    if (!authState.isExempt && checksRemaining <= 0) {
+    if (!authState.isExempt && authState.subscriptionPlan !== 'pro' && checksRemaining <= 0) {
       isRequestInFlight = false;
       set({ error: `${platformLabel} daily limit reached.`, limitReached: true });
       return false;
@@ -97,54 +97,61 @@ export const useCheckStore = create<CheckStore>((set, get) => ({
 
     set({ isLoading: true, error: null, result: null });
 
-    try {
-      const headers: Record<string, string> = {};
-      if (API_KEY) headers['X-API-Key'] = API_KEY;
-      if (authState.deviceId) headers['X-Device-Id'] = authState.deviceId;
+    const attemptRequest = async (isRetry = false): Promise<boolean> => {
+      try {
+        const headers: Record<string, string> = {};
+        if (API_KEY) headers['X-API-Key'] = API_KEY;
+        if (authState.deviceId) headers['X-Device-Id'] = authState.deviceId;
 
-      const response = await axios.post(`${API_URL}/api/check`, {
-        url,
-        language_code: languageCode,
-      }, {
-        timeout: 120000, // 2 minutes timeout
-        headers,
-      });
+        const response = await axios.post(`${API_URL}/api/check`, {
+          url,
+          language_code: languageCode,
+        }, {
+          timeout: 120000, // 2 minutes
+          headers,
+        });
 
-      // Discard if a newer request has already been started
-      if (myId !== latestRequestId) return false;
+        if (myId !== latestRequestId) return false;
 
-      isRequestInFlight = false;
-      useAuthStore.getState().fetchUsage();
-      set({ result: response.data, isLoading: false });
-      return true;
-    } catch (error: any) {
-      if (myId !== latestRequestId) return false;
+        isRequestInFlight = false;
+        useAuthStore.getState().fetchUsage();
+        set({ result: response.data, isLoading: false });
+        return true;
+      } catch (error: any) {
+        if (myId !== latestRequestId) return false;
 
-      isRequestInFlight = false;
+        // Auto-retry once on network drop (e.g. app went to background mid-request)
+        // Server may have cached the result already — retry hits cache instantly
+        if (!isRetry && error.message === 'Network Error') {
+          await new Promise(res => setTimeout(res, 2000));
+          if (myId !== latestRequestId) return false;
+          return attemptRequest(true);
+        }
 
-      let errorMessage = 'Something went wrong. Please try again.';
+        isRequestInFlight = false;
 
-      if (error.response?.status === 429) {
-        set({ error: null, limitReached: true, isLoading: false });
+        let errorMessage = 'Something went wrong. Please try again.';
+
+        if (error.response?.status === 429) {
+          set({ error: null, limitReached: true, isLoading: false });
+          return false;
+        }
+
+        if (error.response?.data?.detail) {
+          const detail = error.response.data.detail;
+          errorMessage = typeof detail === 'object' ? detail.message || errorMessage : detail;
+        } else if (error.message === 'Network Error') {
+          errorMessage = "Connection lost. Please try again.";
+        } else if (error.code === 'ECONNABORTED') {
+          errorMessage = 'Request timed out. Please try again.';
+        }
+
+        set({ error: errorMessage, isLoading: false });
         return false;
       }
+    };
 
-      if (error.response?.data?.detail) {
-        const detail = error.response.data.detail;
-        if (typeof detail === 'object') {
-          errorMessage = detail.message || errorMessage;
-        } else {
-          errorMessage = detail;
-        }
-      } else if (error.message === 'Network Error') {
-        errorMessage = "Can't reach server. Check your connection.";
-      } else if (error.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please try again.';
-      }
-
-      set({ error: errorMessage, isLoading: false });
-      return false;
-    }
+    return attemptRequest();
   },
 
   reset: () => {
