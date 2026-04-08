@@ -1702,7 +1702,10 @@ async def razorpay_webhook(request: Request):
     body = await request.body()
     signature = request.headers.get("X-Razorpay-Signature", "")
 
+    logger.info(f"Razorpay webhook received: sig={'present' if signature else 'MISSING'} body_len={len(body)}")
+
     if not RAZORPAY_WEBHOOK_SECRET:
+        logger.error("Razorpay webhook: RAZORPAY_WEBHOOK_SECRET not configured")
         raise HTTPException(status_code=503, detail="Webhook secret not configured")
 
     # Constant-time HMAC verification — prevents timing attacks
@@ -1712,7 +1715,7 @@ async def razorpay_webhook(request: Request):
         "sha256",
     ).hexdigest()
     if not hmac_lib.compare_digest(expected, signature):
-        logger.warning("Razorpay webhook: invalid signature rejected")
+        logger.error(f"Razorpay webhook: INVALID signature. Expected={expected[:16]}... Got={signature[:16]}...")
         raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
     try:

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Platform, Linking, Alert,
+  ActivityIndicator, Platform, Linking, Alert, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,11 +39,42 @@ export default function PricingScreen() {
   const { isAuthenticated, googleEmail, deviceId, fetchSubscription, subscriptionPlan } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [webIdToken, setWebIdToken] = useState<string | null>(null);
+  const [pollingForActivation, setPollingForActivation] = useState(false);
+  const appState = useRef(AppState.currentState);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Configure Google Sign-In for web
   useEffect(() => {
     GoogleSignin.configure({ webClientId: GOOGLE_CLIENT_ID_WEB, offlineAccess: true });
   }, []);
+
+  // When user returns from browser after payment, poll subscription status
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (appState.current.match(/inactive|background/) && nextState === 'active' && pollingForActivation) {
+        // App just came to foreground — user may have completed payment
+        let attempts = 0;
+        const maxAttempts = 8; // poll for up to ~24s
+        pollIntervalRef.current = setInterval(async () => {
+          attempts++;
+          await fetchSubscription();
+          if (useAuthStore.getState().subscriptionPlan === 'pro' || attempts >= maxAttempts) {
+            clearInterval(pollIntervalRef.current!);
+            setPollingForActivation(false);
+            if (useAuthStore.getState().subscriptionPlan === 'pro') {
+              Alert.alert('Pro Activated!', 'Your subscription is now active. Enjoy unlimited checks!');
+              router.back();
+            }
+          }
+        }, 3000);
+      }
+      appState.current = nextState;
+    });
+    return () => {
+      subscription.remove();
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [pollingForActivation]);
 
   const handleSubscribe = async () => {
     setLoading(true);
@@ -67,6 +98,7 @@ export default function PricingScreen() {
           return;
         }
         if (short_url) {
+          setPollingForActivation(true);
           await Linking.openURL(short_url);
           setLoading(false);
           return;
@@ -99,6 +131,7 @@ export default function PricingScreen() {
           return;
         }
         if (short_url) {
+          setPollingForActivation(true);
           await Linking.openURL(short_url);
           setLoading(false);
           return;
@@ -174,6 +207,11 @@ export default function PricingScreen() {
             <View style={[styles.alreadyPro, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
               <Ionicons name="shield-checkmark" size={20} color="#4CAF50" />
               <Text style={[styles.alreadyProText, { color: colors.textPrimary }]}>You're already on Pro!</Text>
+            </View>
+          ) : pollingForActivation ? (
+            <View style={[styles.alreadyPro, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <ActivityIndicator size="small" color={colors.saffron} />
+              <Text style={[styles.alreadyProText, { color: colors.textSecondary }]}>Waiting for payment confirmation...</Text>
             </View>
           ) : (
             <TouchableOpacity
