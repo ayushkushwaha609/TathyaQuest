@@ -1734,8 +1734,18 @@ async def razorpay_webhook(request: Request):
 
     # Extract subscription entity — present in subscription.* events
     sub_entity = payload.get("payload", {}).get("subscription", {}).get("entity", {})
-    # Extract payment entity — present in payment.* events (has subscription_id field)
+    # Extract payment entity — present in payment.* events
     pay_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+
+    # Debug: log actual keys so we can see what Razorpay sends
+    if pay_entity:
+        logger.info(f"Webhook pay_entity keys: {list(pay_entity.keys())}")
+        logger.info(f"Webhook pay_entity subscription_id={pay_entity.get('subscription_id')!r} "
+                     f"invoice_id={pay_entity.get('invoice_id')!r} "
+                     f"order_id={pay_entity.get('order_id')!r} "
+                     f"notes={pay_entity.get('notes')!r}")
+    if sub_entity:
+        logger.info(f"Webhook sub_entity keys: {list(sub_entity.keys())}")
 
     # Prefer subscription entity; fall back to payment entity for subscription context
     subscription_id = sub_entity.get("id") or pay_entity.get("subscription_id")
@@ -1743,9 +1753,54 @@ async def razorpay_webhook(request: Request):
     google_id = notes.get("google_id") if isinstance(notes, dict) else None
     email_from_notes = (notes.get("email") or "").strip().lower() if isinstance(notes, dict) else ""
 
+    # If subscription_id still missing but we have a payment entity,
+    # resolve it via Razorpay API, then fall back to our own DB
+    api_call_failed = False
+    if not subscription_id and pay_entity:
+        payment_id = pay_entity.get("id")
+        if payment_id and rzp_client:
+            try:
+                # Razorpay SDK is synchronous — run in thread to avoid blocking event loop
+                payment_details = await asyncio.to_thread(rzp_client.payment.fetch, payment_id)
+                subscription_id = payment_details.get("subscription_id")
+                if subscription_id:
+                    logger.info(f"Webhook: resolved subscription_id={subscription_id} via Razorpay payment.fetch({payment_id})")
+                # Also get notes from the subscription itself
+                if subscription_id and not google_id:
+                    try:
+                        sub_details = await asyncio.to_thread(rzp_client.subscription.fetch, subscription_id)
+                        sub_notes = sub_details.get("notes", {})
+                        if isinstance(sub_notes, dict):
+                            google_id = google_id or sub_notes.get("google_id")
+                            email_from_notes = email_from_notes or (sub_notes.get("email") or "").strip().lower()
+                            logger.info(f"Webhook: resolved google_id={google_id!r} email={email_from_notes!r} via subscription.fetch")
+                    except Exception as e:
+                        logger.warning(f"Webhook: failed to fetch subscription details: {e}")
+            except Exception as e:
+                logger.error(f"Webhook: failed to fetch payment details for {payment_id}: {e}")
+                api_call_failed = True
+
+        # Fallback: look up subscription in our own DB by payment email
+        if not subscription_id:
+            pay_email = (pay_entity.get("email") or "").strip().lower()
+            if pay_email:
+                our_sub = await subscriptions_collection.find_one(
+                    {"google_email": pay_email, "status": {"$in": ["created", "active"]}},
+                    sort=[("created_at", -1)],
+                )
+                if our_sub:
+                    subscription_id = our_sub.get("razorpay_subscription_id")
+                    google_id = google_id or our_sub.get("google_id")
+                    email_from_notes = email_from_notes or pay_email
+                    logger.info(f"Webhook: resolved subscription from our DB via pay_email={pay_email} sub_id={subscription_id}")
+
     logger.info(f"Razorpay webhook event={event!r} subscription_id={subscription_id!r} google_id={google_id!r} email={email_from_notes!r} has_sub_entity={bool(sub_entity)} has_pay_entity={bool(pay_entity)}")
 
     if not subscription_id:
+        if api_call_failed:
+            # API call failed — return 500 so Razorpay retries this webhook
+            logger.error(f"Webhook: returning 500 to trigger retry for event={event!r}")
+            raise HTTPException(status_code=500, detail="Temporary failure resolving payment")
         logger.warning(f"Razorpay webhook: no subscription_id found in payload for event={event!r}")
         return {"status": "ok"}
 
